@@ -18869,16 +18869,6 @@
   },
   {
     "date": "2026/07/29",
-    "name": "cheapchicfinds",
-    "email": "malyri@cheapchicfinds.com",
-    "brand": "Saodimallsu",
-    "channel": "Instagram",
-    "status": "Connected",
-    "note": "",
-    "id": "1781148559417_2595_malyri@cheapchicfinds.com"
-  },
-  {
-    "date": "2026/07/29",
     "name": "brightonbutler",
     "email": "brighton@brightontheday.com",
     "brand": "Saodimallsu",
@@ -52283,7 +52273,7 @@
     "email": "thehomrichhome@gmail.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "Connected",
+    "status": "Reject",
     "note": "",
     "id": "1781148559417_2367_thehomrichhome@gmail.com"
   },
@@ -53266,5 +53256,15 @@
     "status": "Connected",
     "note": "",
     "id": "1781148559417_2594_nikaposh1@gmail.com"
+  },
+  {
+    "date": "2026/09/24",
+    "name": "cheapchicfinds",
+    "email": "malyri@cheapchicfinds.com",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "status": "Connected",
+    "note": "",
+    "id": "1781148559417_2595_malyri@cheapchicfinds.com"
   }
 ]
