@@ -8758,10 +8758,14 @@ function discoverySearch() {
             discoverySelected.clear();
             discoveryRenderTable();
             var dropped = data.dropped || 0;
+            var droppedInHistory = data.droppedInHistory || 0;
+            var droppedInLibrary = data.droppedInLibrary || 0;
             if (discoveryResults.length === 0 && dropped === 0) {
                 statusEl.innerText = '未找到结果，试试别的关键词或类型';
+            } else if (dropped === 0) {
+                statusEl.innerText = '本次找到 ' + discoveryResults.length + ' 个新账号';
             } else {
-                statusEl.innerText = '本次找到 ' + discoveryResults.length + ' 个新账号（已自动过滤 ' + dropped + ' 个重复）';
+                statusEl.innerText = '本次找到 ' + discoveryResults.length + ' 个新账号（已过滤 ' + dropped + ' 个重复，其中 ' + droppedInHistory + ' 个在搜索历史、' + droppedInLibrary + ' 个已在红人库）';
             }
         } else {
             statusEl.innerText = '搜索失败';

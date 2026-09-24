@@ -31,7 +31,7 @@ const discoverySeenUsernames = new Set();
 try {
   if (fs.existsSync(DISCOVERY_HISTORY_FILE)) {
     const hist = JSON.parse(fs.readFileSync(DISCOVERY_HISTORY_FILE, 'utf8'));
-    (Array.isArray(hist) ? hist : []).forEach(function (u) { if (u) discoverySeenUsernames.add(String(u)); });
+    (Array.isArray(hist) ? hist : []).forEach(function (u) { if (u) discoverySeenUsernames.add(String(u).toLowerCase()); });
   }
 } catch (e) {
   console.warn('[Discovery] 读取去重历史失败:', e.message);
@@ -43,6 +43,23 @@ function saveDiscoveryHistory() {
   } catch (e) {
     console.error('[Discovery] 保存去重历史失败:', e.message);
   }
+}
+
+// 读红人库，把每个红人的 name（即 Instagram 用户名）收集成小写 Set，用于去重对比
+function loadInfluencerNames() {
+  const names = new Set();
+  try {
+    if (fs.existsSync(INFLUENCER_DATA_FILE)) {
+      const data = JSON.parse(fs.readFileSync(INFLUENCER_DATA_FILE, 'utf8'));
+      const arr = Array.isArray(data) ? data : [];
+      arr.forEach(function (it) {
+        if (it && it.name) names.add(String(it.name).toLowerCase());
+      });
+    }
+  } catch (e) {
+    console.warn('[Discovery] 读取红人库失败:', e.message);
+  }
+  return names;
 }
 
 const MIME = {
@@ -443,14 +460,33 @@ function createServer() {
           }
         }
 
-        // 去重：过滤已见过的 username，新账号加入历史并落盘
+        // 去重：同时过滤「搜索历史见过的 username」和「红人库已有的红人」。
+        // 用户名统一转小写再比，避免 Yoga_xxx / yoga_xxx 被当成不同人。
         const rawCount = profiles.length;
-        const fresh = profiles.filter(it => it && it.username && !discoverySeenUsernames.has(it.username));
-        fresh.forEach(it => discoverySeenUsernames.add(it.username));
+        const influencerNames = loadInfluencerNames();
+        let droppedInHistory = 0;
+        let droppedInLibrary = 0;
+        const fresh = [];
+        profiles.forEach(function (it) {
+          if (!it || !it.username) return;
+          const uname = String(it.username).toLowerCase();
+          if (discoverySeenUsernames.has(uname)) { droppedInHistory++; return; }
+          if (influencerNames.has(uname)) { droppedInLibrary++; return; }
+          fresh.push(it);
+          discoverySeenUsernames.add(uname);
+        });
         saveDiscoveryHistory();
-        const dropped = rawCount - fresh.length;
-        console.log('[discovery-search] 最终新账号 %d 个（过滤重复 %d 个）', fresh.length, dropped);
-        sendJSON(res, 200, { success: true, data: fresh, total: rawCount, newCount: fresh.length, dropped: dropped });
+        const dropped = droppedInHistory + droppedInLibrary;
+        console.log('[discovery-search] 最终新账号 %d 个（过滤 %d 个：历史 %d + 红人库 %d）', fresh.length, dropped, droppedInHistory, droppedInLibrary);
+        sendJSON(res, 200, {
+          success: true,
+          data: fresh,
+          total: rawCount,
+          newCount: fresh.length,
+          dropped: dropped,
+          droppedInHistory: droppedInHistory,
+          droppedInLibrary: droppedInLibrary
+        });
       } catch (err) {
         console.error('[discovery-search] 错误:', err.message);
         sendJSON(res, 500, { success: false, error: err.message || '请求失败' });
