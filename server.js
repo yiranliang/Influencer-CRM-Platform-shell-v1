@@ -22,8 +22,8 @@ try {
   console.warn('[Apify] 未找到 apify_config.json 或解析失败');
 }
 
-// Apify Instagram Scraper 默认结果条数（前端「结果数」可覆盖，上限 100）
-const APIFY_RESULTS_LIMIT = 20;
+// Apify Instagram Scraper 默认搜索账号数（前端「结果数」可覆盖，范围 1-250）
+const APIFY_RESULTS_LIMIT = 10;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -354,14 +354,14 @@ function createServer() {
       const searchType = body.searchType || 'profile';
       let limit = parseInt(body.resultsLimit, 10);
       if (isNaN(limit) || limit < 1) limit = APIFY_RESULTS_LIMIT;
-      if (limit > 100) limit = 100;
+      if (limit > 250) limit = 250;
       if (!keyword) { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
 
-      // 组装 Apify 请求体（搜索场景用 searchLimit 才能真正限制返回用户数）
+      // 组装 Apify 请求体（searchLimit 控制账号数；resultsLimit 是"每账号抓多少帖子"，我们不要帖子所以不传）
       let apifyBody;
       if (searchType === 'url') {
-        apifyBody = { directUrls: [keyword], resultsType: 'details', resultsLimit: limit };
+        apifyBody = { directUrls: [keyword], resultsType: 'details' };
       } else {
         apifyBody = {
           search: keyword,
