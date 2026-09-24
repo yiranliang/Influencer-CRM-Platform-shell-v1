@@ -1,0 +1,403 @@
+[
+  {
+    "id": "pay_1790219216641_y9mixv",
+    "influencerId": "1781148559417_203_sevilayyldrmcelik@gmail.com",
+    "email": "sevilayyldrmcelik@gmail.com",
+    "name": "sevilay.ycelik",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "sevilayyldrmcelik@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2025-12",
+        "type": "paid",
+        "fee": 300,
+        "orders": 78,
+        "cpa": "3.85",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": true,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:06:56.641Z",
+    "updatedAt": "2026-09-24T03:07:07.349Z"
+  },
+  {
+    "id": "pay_1790219305336_d29v86",
+    "influencerId": "1781148559417_172_ninajgerenaia@gmail.com",
+    "email": "ninajgerenaia@gmail.com",
+    "name": "nina_jgerenaia",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "ninajgerenaia@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2025-12",
+        "type": "paid",
+        "fee": 200,
+        "orders": 0,
+        "cpa": null,
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:08:25.336Z",
+    "updatedAt": "2026-09-24T03:08:37.250Z"
+  },
+  {
+    "id": "pay_1790219371900_zllvj3",
+    "influencerId": "1781148559417_166_ugcbyduygu@gmail.com",
+    "email": "ugcbyduygu@gmail.com",
+    "name": "dygu.ylldrm",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "Ugcbyduygu@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-01",
+        "type": "paid",
+        "fee": 300,
+        "orders": 79,
+        "cpa": "3.80",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:09:31.900Z",
+    "updatedAt": "2026-09-24T03:09:45.040Z"
+  },
+  {
+    "id": "pay_1790219540104_okk1zo",
+    "influencerId": "1781148559417_407_info@vintagepickin.com",
+    "email": "info@vintagepickin.com",
+    "name": "aprilwilksvp",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "Info@vintagepickin.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-02",
+        "type": "paid",
+        "fee": 500,
+        "orders": 141,
+        "cpa": "3.55",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:12:20.104Z",
+    "updatedAt": "2026-09-24T03:12:36.334Z"
+  },
+  {
+    "id": "pay_1790219589684_lnhcto",
+    "influencerId": "1781148559417_331_collabs@carriesclosetdiary.com",
+    "email": "collabs@carriesclosetdiary.com",
+    "name": "carriesclosetdiary",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "Carrie@EricCliffel.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-02",
+        "type": "paid",
+        "fee": 600,
+        "orders": 9,
+        "cpa": "66.67",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:13:09.684Z",
+    "updatedAt": "2026-09-24T03:13:15.228Z"
+  },
+  {
+    "id": "pay_1790219630964_5ms9xv",
+    "influencerId": "1781148559417_596_sono.fashionfit@gmail.com",
+    "email": "sono.fashionfit@gmail.com",
+    "name": "sono_fitmom",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "sono.fashionfit@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-03",
+        "type": "paid",
+        "fee": 800,
+        "orders": 1,
+        "cpa": "800.00",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:13:50.964Z",
+    "updatedAt": "2026-09-24T03:13:56.748Z"
+  },
+  {
+    "id": "pay_1790219673344_trz319",
+    "influencerId": "1781148559415_51_jennahubka@yahoo.com",
+    "email": "jennahubka@yahoo.com",
+    "name": "random_housewife",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "JJhubka@yahoo.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-02",
+        "type": "paid",
+        "fee": 650,
+        "orders": 42,
+        "cpa": "15.48",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:14:33.344Z",
+    "updatedAt": "2026-09-24T03:14:39.307Z"
+  },
+  {
+    "id": "pay_1790219716995_0sikx8",
+    "influencerId": "1781148559415_22_hellostyledandtaylered@gmail.com",
+    "email": "hellostyledandtaylered@gmail.com",
+    "name": "styledandtaylered",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "Styledandtaylered@mail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-03",
+        "type": "paid",
+        "fee": 650,
+        "orders": 60,
+        "cpa": "10.83",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:15:16.995Z",
+    "updatedAt": "2026-09-24T03:15:22.343Z"
+  },
+  {
+    "id": "pay_1790219756428_p4oot7",
+    "influencerId": "1781148559417_3398_ismgll.ocak28@gmail.com",
+    "email": "ismgll.ocak28@gmail.com",
+    "name": "ismgllock",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "akbababjk1903@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-05",
+        "type": "paid",
+        "fee": 200,
+        "orders": 37,
+        "cpa": "5.41",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:15:56.428Z",
+    "updatedAt": "2026-09-24T03:16:02.412Z"
+  },
+  {
+    "id": "pay_1790219794412_06gg9j",
+    "influencerId": "1781148559417_2440_confetticallie@gmail.com",
+    "email": "confetticallie@gmail.com",
+    "name": "confetticallie",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "calliecornilles@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-06",
+        "type": "paid",
+        "fee": 300,
+        "orders": 0,
+        "cpa": null,
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:16:34.412Z",
+    "updatedAt": "2026-09-24T03:16:41.291Z"
+  },
+  {
+    "id": "pay_1790219862585_9vimyq",
+    "influencerId": "1786327286904_bxsvs1u7",
+    "email": "mehriu01@gmail.com",
+    "name": "lifestyled_by_mehri",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "mehriu01@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-06",
+        "type": "paid",
+        "fee": 100,
+        "orders": 0,
+        "cpa": null,
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:17:42.585Z",
+    "updatedAt": "2026-09-24T03:17:51.720Z"
+  },
+  {
+    "id": "pay_1790219917572_law4lh",
+    "influencerId": "1781148559417_3400_Collaborationjenny@gmail.com",
+    "email": "Collaborationjenny@gmail.com",
+    "name": "jennymarquez_x3",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "Jennymarquez527@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-05",
+        "type": "paid",
+        "fee": 200,
+        "orders": 230,
+        "cpa": "0.87",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:18:37.571Z",
+    "updatedAt": "2026-09-24T03:18:43.835Z"
+  },
+  {
+    "id": "pay_1790220144276_x0gx31",
+    "influencerId": "1781148559417_3511_caitlinzintl@gmail.com",
+    "email": "caitlinzintl@gmail.com",
+    "name": "caitlinzintl",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "caitlinzintl@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-06",
+        "type": "paid",
+        "fee": 400,
+        "orders": 31,
+        "cpa": "12.90",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:22:24.276Z",
+    "updatedAt": "2026-09-24T03:22:29.303Z"
+  },
+  {
+    "id": "pay_1790220181408_aqui7o",
+    "influencerId": "1781148559417_3756_zilimonika1@gmail.com",
+    "email": "zilimonika1@gmail.com",
+    "name": "mona_monica1",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "zilimonika1@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-06",
+        "type": "paid",
+        "fee": 200,
+        "orders": 266,
+        "cpa": "0.75",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:23:01.407Z",
+    "updatedAt": "2026-09-24T03:23:05.848Z"
+  },
+  {
+    "id": "pay_1790220399104_5gdxz2",
+    "influencerId": "1781148559417_808_planesandprettythings@gmail.com",
+    "email": "planesandprettythings@gmail.com",
+    "name": "planesandprettythings",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "phillip.huebner92@gmail.com",
+    "cooperationType": "package",
+    "packageInfo": {
+      "totalFee": 9000,
+      "startMonth": "2026-07",
+      "endMonth": "2026-09",
+      "months": 3,
+      "reelsPerMonth": 1
+    },
+    "collaborations": [
+      {
+        "monthKey": "2026-09",
+        "type": "paid",
+        "fee": 3000,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-08",
+        "type": "paid",
+        "fee": 3000,
+        "orders": 170,
+        "cpa": "17.65",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-07",
+        "type": "paid",
+        "fee": 3000,
+        "orders": 121,
+        "cpa": "24.79",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T03:26:39.103Z",
+    "updatedAt": "2026-09-24T03:27:48.903Z"
+  }
+]

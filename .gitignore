@@ -1,0 +1,29 @@
+# ========== 凭证（绝不进 git）==========
+credentials.json
+token.json
+*.pem
+*.key
+
+# ========== 依赖 ==========
+node_modules/
+
+# ========== 浏览器缓存（含 Gmail 登录态）==========
+.browser-profile/
+.browser-profile-playwright/
+
+# ========== 测试 / 缓存产物 ==========
+screenshots/
+*.png
+.history/
+.DS_Store
+*.log
+backups/
+
+# ========== 编辑器 / AI 工具 ==========
+.claude/
+.vscode/
+.idea/
+
+# ========== 垃圾文件 ==========
+*hboard.html*
+*弹出*
