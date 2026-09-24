@@ -1922,22 +1922,22 @@
             <div class="card">
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
                     <select id="discoverySearchType" class="payment-status-filter" style="min-width:130px;">
-                        <option value="profile">关键词搜用户</option>
-                        <option value="hashtag">话题标签</option>
+                        <option value="hashtag">话题标签找红人</option>
                         <option value="url">已知 URL 抓取</option>
                     </select>
                     <div class="search-wrapper" style="flex:1;min-width:260px;">
-                        <input type="text" id="discoveryKeyword" class="search-input" style="width:100%;" placeholder="输入关键词，如 yoga、fitness..." onkeydown="if(event.key==='Enter'){discoverySearch();}">
+                        <input type="text" id="discoveryKeyword" class="search-input" style="width:100%;" placeholder="输入话题标签，如 yoga、fitness（不用加 #）" onkeydown="if(event.key==='Enter'){discoverySearch();}">
                         <span class="search-icon">🔍</span>
                         <span class="search-clear" onclick="clearSearch('discoveryKeyword')">×</span>
                     </div>
-                    <label style="font-size:13px;color:#475569;white-space:nowrap;">结果数</label>
-                    <input type="number" id="discoveryResultsLimit" value="10" min="1" max="250" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                    <label style="font-size:13px;color:#475569;white-space:nowrap;">抓取帖子数</label>
+                    <input type="number" id="discoveryResultsLimit" value="50" min="10" max="100" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
                 </div>
 
                 <div style="font-size:13px;color:#64748b;margin-bottom:12px;">
-                    搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。
+                    搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>
+                    话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。
                 </div>
 
                 <div class="filter-bar" style="gap:12px;flex-wrap:wrap;">
@@ -8739,9 +8739,9 @@ function discoverySearch() {
     var keyword = document.getElementById('discoveryKeyword').value.trim();
     var type = document.getElementById('discoverySearchType').value;
     var limit = parseInt(document.getElementById('discoveryResultsLimit').value, 10);
-    if (isNaN(limit) || limit < 1) limit = 10;
-    if (limit > 250) limit = 250;
-    if (!keyword) { showToast('请输入关键词', 'error'); return; }
+    if (isNaN(limit) || limit < 10) limit = 50;
+    if (limit > 100) limit = 100;
+    if (!keyword) { showToast('请输入话题标签或 URL', 'error'); return; }
     var btn = document.getElementById('discoverySearchBtn');
     var statusEl = document.getElementById('discoveryStatus');
     statusEl.innerText = '搜索中，请稍候（约 30 秒 - 2 分钟）...';

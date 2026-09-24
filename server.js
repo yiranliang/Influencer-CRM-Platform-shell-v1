@@ -22,8 +22,8 @@ try {
   console.warn('[Apify] 未找到 apify_config.json 或解析失败');
 }
 
-// Apify Instagram Scraper 默认搜索账号数（前端「结果数」可覆盖，范围 1-250）
-const APIFY_RESULTS_LIMIT = 10;
+// Discovery 默认抓取帖子数（话题标签模式，前端「结果数」可覆盖，范围 10-100）
+const APIFY_RESULTS_LIMIT = 50;
 
 // Discovery 去重历史（记录已见过的 username，落盘不入 git）
 const DISCOVERY_HISTORY_FILE = path.join(__dirname, 'discovery_history.json');
@@ -367,69 +367,93 @@ function createServer() {
     return;
   }
 
-  // POST /api/discovery-search — 调 Apify Instagram Scraper 搜索红人
+  // POST /api/discovery-search — 调 Apify Instagram Scraper 发现红人
   if (pathname === '/api/discovery-search' && req.method === 'POST') {
     parseBody(req).then(async (body) => {
       const keyword = (body.keyword || '').trim();
-      const searchType = body.searchType || 'profile';
+      const searchType = body.searchType || 'hashtag';
       let limit = parseInt(body.resultsLimit, 10);
-      if (isNaN(limit) || limit < 1) limit = APIFY_RESULTS_LIMIT;
-      if (limit > 250) limit = 250;
+      if (isNaN(limit) || limit < 10) limit = APIFY_RESULTS_LIMIT; // 默认 50
+      if (limit > 100) limit = 100;
       if (!keyword) { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
 
-      // 组装 Apify 请求体（searchLimit 控制账号数；resultsLimit 是"每账号抓多少帖子"，我们不要帖子所以不传）
-      let apifyBody;
-      if (searchType === 'url') {
-        apifyBody = { directUrls: [keyword], resultsType: 'details' };
-      } else {
-        apifyBody = {
-          search: keyword,
-          searchType: searchType === 'hashtag' ? 'hashtag' : 'user',
-          searchLimit: limit,
-          resultsType: 'details'
-        };
-      }
-
-      // 打印请求参数（Token 打码，不泄露完整凭证）
       const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
-      console.log('[discovery-search] keyword=%s, type=%s -> %s, limit=%d, token=%s',
-        keyword, searchType, searchType === 'url' ? 'directUrls' : apifyBody.searchType, limit, maskedToken);
+      const APIFY_URL = 'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN);
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 290000);
-      try {
-        const resp = await fetch(
-          'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN),
-          {
+      // 调一次 Apify（每步独立超时，token 打码打印请求体）
+      async function callApify(apifyBody, label) {
+        console.log('[discovery-search] %s 请求体: %s (token=%s)', label, JSON.stringify(apifyBody), maskedToken);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 290000);
+        try {
+          const resp = await fetch(APIFY_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(apifyBody),
             signal: controller.signal
+          });
+          clearTimeout(timer);
+          if (!resp.ok) {
+            const text = await resp.text();
+            console.error('[discovery-search] %s Apify 非 200:', label, resp.status, text.slice(0, 300));
+            throw new Error('Apify HTTP ' + resp.status);
           }
-        );
-        clearTimeout(timer);
-        if (!resp.ok) {
-          const text = await resp.text();
-          console.error('[discovery-search] Apify 非 200:', resp.status, text.slice(0, 500));
-          sendJSON(res, 502, { success: false, error: 'Apify 请求失败（HTTP ' + resp.status + '）' });
-          return;
+          const data = await resp.json();
+          const items = Array.isArray(data) ? data : [];
+          console.log('[discovery-search] %s 返回 %d 条', label, items.length);
+          return items;
+        } catch (err) {
+          clearTimeout(timer);
+          if (err && err.name === 'AbortError') throw new Error('Apify 请求超时（约 5 分钟）');
+          throw err;
         }
-        const data = await resp.json();
-        const items = Array.isArray(data) ? data : [];
+      }
+
+      try {
+        let profiles = []; // 最终返回的账号详情数组
+
+        if (searchType === 'url') {
+          // URL 精确抓取：直接抓账号详情
+          profiles = await callApify({ directUrls: [keyword], resultsType: 'details' }, 'URL抓取');
+        } else {
+          // 话题标签：第 1 步抓该标签下的帖子，第 2 步反推创作者详情
+          const step1Body = {
+            directUrls: ['https://www.instagram.com/explore/tags/' + keyword + '/'],
+            resultsType: 'posts',
+            resultsLimit: limit
+          };
+          const posts = await callApify(step1Body, '第1步-抓帖子');
+          const usernames = [...new Set(posts.map(p => p && p.ownerUsername).filter(Boolean))];
+          console.log('[discovery-search] 第1步提取到 %d 个去重用户名', usernames.length);
+
+          const topUsernames = usernames.slice(0, 30);
+          if (topUsernames.length > 0) {
+            const step2Body = {
+              directUrls: topUsernames.map(u => 'https://www.instagram.com/' + u + '/'),
+              resultsType: 'details'
+            };
+            try {
+              profiles = await callApify(step2Body, '第2步-抓详情');
+            } catch (err) {
+              // 第 2 步失败：降级为只返回用户名（无粉丝数等详情）
+              console.warn('[discovery-search] 第2步失败，降级为仅用户名:', err.message);
+              profiles = topUsernames.map(u => ({ username: u }));
+            }
+          }
+        }
+
         // 去重：过滤已见过的 username，新账号加入历史并落盘
-        const rawCount = items.length;
-        const fresh = items.filter(it => it && it.username && !discoverySeenUsernames.has(it.username));
+        const rawCount = profiles.length;
+        const fresh = profiles.filter(it => it && it.username && !discoverySeenUsernames.has(it.username));
         fresh.forEach(it => discoverySeenUsernames.add(it.username));
         saveDiscoveryHistory();
         const dropped = rawCount - fresh.length;
-        console.log('[discovery-search] 返回', rawCount, '条，新账号', fresh.length, '个，过滤重复', dropped, '个');
+        console.log('[discovery-search] 最终新账号 %d 个（过滤重复 %d 个）', fresh.length, dropped);
         sendJSON(res, 200, { success: true, data: fresh, total: rawCount, newCount: fresh.length, dropped: dropped });
       } catch (err) {
-        clearTimeout(timer);
-        console.error('[discovery-search] 请求错误:', err.name, err.message);
-        const msg = (err && err.name === 'AbortError') ? 'Apify 请求超时（约 5 分钟）' : (err.message || '请求失败');
-        sendJSON(res, 500, { success: false, error: msg });
+        console.error('[discovery-search] 错误:', err.message);
+        sendJSON(res, 500, { success: false, error: err.message || '请求失败' });
       }
     }).catch(err => sendJSON(res, 400, { error: err.message }));
     return;
