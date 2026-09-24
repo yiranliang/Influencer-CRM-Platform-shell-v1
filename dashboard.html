@@ -1931,7 +1931,7 @@
                         <span class="search-icon">🔍</span>
                         <span class="search-clear" onclick="clearSearch('discoveryKeyword')">×</span>
                     </div>
-                    <button class="btn-primary" onclick="discoverySearch()">搜索</button>
+                    <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
                 </div>
 
                 <div style="font-size:13px;color:#64748b;margin-bottom:12px;">
@@ -8736,17 +8736,36 @@ function discoverySearch() {
     var keyword = document.getElementById('discoveryKeyword').value.trim();
     var type = document.getElementById('discoverySearchType').value;
     if (!keyword) { showToast('请输入关键词', 'error'); return; }
-    document.getElementById('discoveryStatus').innerText = '搜索中...（当前为演示数据，未接入 Apify）';
-    setTimeout(function() {
-        discoveryResults = [
-            { username: keyword + '_fashion', followersCount: 45000, postsCount: 320, biography: 'Fashion & lifestyle creator based in LA', verified: false },
-            { username: keyword + '_daily', followersCount: 128000, postsCount: 890, biography: 'Daily ' + keyword + ' content', verified: true },
-            { username: keyword + '_world', followersCount: 8200, postsCount: 140, biography: 'Micro influencer | ' + keyword, verified: false }
-        ];
-        discoverySelected.clear();
-        discoveryRenderTable();
-        document.getElementById('discoveryStatus').innerText = '找到 ' + discoveryResults.length + ' 个结果（演示数据）';
-    }, 500);
+    var btn = document.getElementById('discoverySearchBtn');
+    var statusEl = document.getElementById('discoveryStatus');
+    statusEl.innerText = '搜索中，请稍候（约 30 秒 - 2 分钟）...';
+    if (btn) btn.disabled = true;
+    fetch('/api/discovery-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: keyword, searchType: type })
+    }).then(function(resp) { return resp.json(); })
+    .then(function(data) {
+        if (btn) btn.disabled = false;
+        if (data && data.success) {
+            discoveryResults = Array.isArray(data.data) ? data.data : [];
+            discoverySelected.clear();
+            discoveryRenderTable();
+            if (discoveryResults.length === 0) {
+                statusEl.innerText = '未找到结果，试试别的关键词或类型';
+            } else {
+                statusEl.innerText = '找到 ' + discoveryResults.length + ' 个结果';
+            }
+        } else {
+            statusEl.innerText = '搜索失败';
+            showToast((data && data.error) || '搜索失败', 'error');
+        }
+    }).catch(function(err) {
+        if (btn) btn.disabled = false;
+        statusEl.innerText = '搜索失败';
+        console.error(err);
+        showToast('请求失败：' + err.message, 'error');
+    });
 }
 
 function discoveryRenderTable() {
@@ -8761,13 +8780,13 @@ function discoveryRenderTable() {
     discoveryResults.forEach(function(r) {
         var checked = discoverySelected.has(r.username) ? ' checked' : '';
         html += '<tr>' +
-            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username) + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
-            '<td><span class="copy-cell">' + escHTML(r.username) + '</span></td>' +
+            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username || '') + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
+            '<td><span class="copy-cell">' + escHTML(r.username || '') + '</span></td>' +
             '<td>' + (r.followersCount || 0).toLocaleString() + '</td>' +
             '<td>' + (r.postsCount || 0) + '</td>' +
             '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
             '<td>' + (r.verified ? '✅' : '-') + '</td>' +
-            '<td><a href="https://instagram.com/' + escAttr(r.username) + '" target="_blank" class="payment-action-btn">查看</a></td>' +
+            '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
             '</tr>';
     });
     tbody.innerHTML = html;
@@ -8815,13 +8834,13 @@ function discoveryApplyFilter() {
     list.forEach(function(r) {
         var checked = discoverySelected.has(r.username) ? ' checked' : '';
         html += '<tr>' +
-            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username) + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
-            '<td><span class="copy-cell">' + escHTML(r.username) + '</span></td>' +
+            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username || '') + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
+            '<td><span class="copy-cell">' + escHTML(r.username || '') + '</span></td>' +
             '<td>' + (r.followersCount || 0).toLocaleString() + '</td>' +
             '<td>' + (r.postsCount || 0) + '</td>' +
             '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
             '<td>' + (r.verified ? '✅' : '-') + '</td>' +
-            '<td><a href="https://instagram.com/' + escAttr(r.username) + '" target="_blank" class="payment-action-btn">查看</a></td>' +
+            '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
             '</tr>';
     });
     tbody.innerHTML = html;

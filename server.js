@@ -13,6 +13,18 @@ const CD_DATA_FILE = path.join(__dirname, 'cd_data.json');
 const PAYMENT_DATA_FILE = path.join(__dirname, 'payment_data.json');
 const EMAIL_CONFIG_FILE = path.join(__dirname, 'email_config.json');
 
+// Apify 配置（凭证不入库，读取根目录 apify_config.json）
+let APIFY_TOKEN = '';
+try {
+  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'apify_config.json'), 'utf-8'));
+  APIFY_TOKEN = cfg.apiToken || '';
+} catch (e) {
+  console.warn('[Apify] 未找到 apify_config.json 或解析失败');
+}
+
+// Apify Instagram Scraper 单次抓取条数上限（省额度）
+const APIFY_RESULTS_LIMIT = 20;
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -331,6 +343,65 @@ function createServer() {
         console.log('[payment] 保存成功:', body.length, '条记录');
         sendJSON(res, 200, { success: true });
       } catch (err) { console.error('[payment] POST error:', err.message); sendJSON(res, 500, { error: err.message }); }
+    }).catch(err => sendJSON(res, 400, { error: err.message }));
+    return;
+  }
+
+  // POST /api/discovery-search — 调 Apify Instagram Scraper 搜索红人
+  if (pathname === '/api/discovery-search' && req.method === 'POST') {
+    parseBody(req).then(async (body) => {
+      const keyword = (body.keyword || '').trim();
+      const searchType = body.searchType || 'profile';
+      if (!keyword) { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
+      if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
+
+      // 组装 Apify 请求体
+      let apifyBody;
+      if (searchType === 'url') {
+        apifyBody = { directUrls: [keyword], resultsType: 'details', resultsLimit: APIFY_RESULTS_LIMIT };
+      } else {
+        apifyBody = {
+          search: keyword,
+          searchType: searchType === 'hashtag' ? 'hashtag' : 'user',
+          searchLimit: APIFY_RESULTS_LIMIT,
+          resultsType: 'details'
+        };
+      }
+
+      // 打印请求参数（Token 打码，不泄露完整凭证）
+      const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
+      console.log('[discovery-search] keyword=%s, type=%s -> %s, limit=%d, token=%s',
+        keyword, searchType, searchType === 'url' ? 'directUrls' : apifyBody.searchType, APIFY_RESULTS_LIMIT, maskedToken);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 180000);
+      try {
+        const resp = await fetch(
+          'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(apifyBody),
+            signal: controller.signal
+          }
+        );
+        clearTimeout(timer);
+        if (!resp.ok) {
+          const text = await resp.text();
+          console.error('[discovery-search] Apify 非 200:', resp.status, text.slice(0, 500));
+          sendJSON(res, 502, { success: false, error: 'Apify 请求失败（HTTP ' + resp.status + '）' });
+          return;
+        }
+        const data = await resp.json();
+        const items = Array.isArray(data) ? data : [];
+        console.log('[discovery-search] 返回', items.length, '条结果');
+        sendJSON(res, 200, { success: true, data: items });
+      } catch (err) {
+        clearTimeout(timer);
+        console.error('[discovery-search] 请求错误:', err.name, err.message);
+        const msg = (err && err.name === 'AbortError') ? 'Apify 请求超时（180s）' : (err.message || '请求失败');
+        sendJSON(res, 500, { success: false, error: msg });
+      }
     }).catch(err => sendJSON(res, 400, { error: err.message }));
     return;
   }
