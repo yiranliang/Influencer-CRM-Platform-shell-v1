@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import path from 'path';
+import fs from 'fs';
 import EventEmitter from 'events';
 import { fileURLToPath } from 'url';
 
@@ -645,48 +646,43 @@ async _scheduleSend() {
     this._log('已点击 More send options 下拉箭头');
     await this._sleep(800);
     
-    // ===== 选择 "Schedule send" 选项 =====
-    this._log('查找 "Schedule send" 选项...');
-    
+    // ===== 选择 "Schedule send"（中文界面为「安排发送」）选项 =====
+    this._log('查找 "Schedule send / 安排发送" 选项...');
+
+    // 不用文本精确匹配：Gmail 会随语言/版本换文案，中文界面是「安排发送」而非「定时发送」。
+    // 优先用 role + aria-label 属性匹配，文本匹配只作兜底，且中英文都列上。
     const scheduleOptionSelectors = [
+        '[role="menuitem"][aria-label*="Schedule"]',
+        '[role="menuitem"][aria-label*="安排"]',
+        '[role="menuitem"][aria-label*="定时"]',
+        '[aria-label*="Schedule send"]',
+        '[aria-label*="安排发送"]',
         'div[role="menuitem"]:has-text("Schedule send")',
+        'div[role="menuitem"]:has-text("安排发送")',
         'div[role="menuitem"]:has-text("定时发送")',
-        'text="Schedule send"',
-        'text="定时发送"'
     ];
-    
-    let scheduleOption = null;
-    for (const selector of scheduleOptionSelectors) {
-        try {
-            const option = await this.page.$(selector);
-            if (option && await option.isVisible()) {
-                scheduleOption = option;
-                this._log(`找到定时发送选项: ${selector}`);
-                break;
-            }
-        } catch (err) {}
-    }
-    
+
+    // 点击下拉箭头后，用真正会等待的 _waitForAnyVisible（内部是 locator.waitFor）等菜单项渲染出来，
+    // 而不是固定 sleep 800ms 再立即查找 —— 网络/动画慢一点就会漏掉。
+    let scheduleOption = await this._waitForAnyVisible(scheduleOptionSelectors, 8000);
+
     if (!scheduleOption) {
+        // 调试：把当前可见的 menuitem 列表打印出来，方便定位真实文案
+        await this._debugDumpMenuItems('查找 Schedule send 选项失败');
+        // 键盘兜底：Gmail 里 's' 键也能展开 Schedule send 子菜单
         this._log('未找到定时发送选项，尝试按 S 键');
         await this.page.keyboard.press('s');
-        await this._sleep(500);
-        
-        for (const selector of scheduleOptionSelectors) {
-            try {
-                scheduleOption = await this.page.$(selector);
-                if (scheduleOption && await scheduleOption.isVisible()) break;
-            } catch (err) {}
-        }
+        scheduleOption = await this._waitForAnyVisible(scheduleOptionSelectors, 4000);
     }
-    
+
     if (scheduleOption) {
         await scheduleOption.click();
-        this._log('已选择定时发送选项');
+        this._log('已选择定时发送选项（Schedule send / 安排发送）');
     } else {
-        throw new Error('无法找到定时发送选项');
+        await this._saveScreenshot('schedule-send-option-not-found');
+        throw new Error('无法找到定时发送选项（Schedule send / 安排发送）');
     }
-    
+
     await this._sleep(800);
     
     // ===== 选择 "Pick date & time" =====
@@ -765,13 +761,18 @@ async _scheduleSend() {
     this._log('查找确认发送按钮...');
 
     const confirmSelectors = [
+        'button[aria-label*="Schedule"]',
+        '[role="button"][aria-label*="Schedule"]',
+        'div[aria-label*="Schedule send"]',
+        '[aria-label*="安排发送"]',
         'button:has-text("Schedule send")',
         'div[role="button"]:has-text("Schedule send")',
+        'button:has-text("安排发送")',
+        'div[role="button"]:has-text("安排发送")',
         'button:has-text("定时发送")',
         'div[role="button"]:has-text("定时发送")',
-        'div[aria-label="Schedule send"]',
-        'div[aria-label*="Schedule"]',
-        'span:has-text("Schedule send")'
+        'span:has-text("Schedule send")',
+        'span:has-text("安排发送")'
     ];
 
     // 超时从 15 秒缩短到 5 秒：这个按钮是随对话框一起渲染的，正常情况下瞬间就在，
@@ -795,6 +796,8 @@ async _scheduleSend() {
             });
             this._log('诊断 - 当前可见按钮文案: ' + JSON.stringify(candidates));
         } catch (e) { /* 诊断失败不影响主流程 */ }
+
+        await this._saveScreenshot('confirm-schedule-send-not-found');
 
         // ★★★ 这个按钮「找不到」往往是好消息：邮件其实已经定时发出去了 ★★★
         // 诊断日志证实过这条路径：页面上看到的是 Gmail 主界面（Compose / Refresh / 邮件列表计数），
@@ -1000,6 +1003,40 @@ async _handleConfirmationDialog() {
       }
     }
     return null;
+  }
+
+  // 调试用：把当前可见的 menuitem 文案（含 aria-label）打印出来，
+  // 方便排查「界面上明明有弹层，却找不到某个选项」时真实文案到底叫什么。
+  async _debugDumpMenuItems(label) {
+    try {
+      const items = await this.page.evaluate(() => {
+        return Array.from(document.querySelectorAll('[role="menuitem"]'))
+          .filter(el => el.offsetParent !== null)
+          .map(el => {
+            const text = ((el.innerText || '').trim().replace(/\s+/g, ' ') || '').slice(0, 40);
+            const aria = el.getAttribute('aria-label') || '';
+            return text ? (aria ? `${text} [aria="${aria}"]` : text) : (aria || '(空)');
+          })
+          .slice(0, 30);
+      });
+      this._log(`诊断 - ${label}，当前可见 menuitem: ${JSON.stringify(items)}`);
+    } catch (e) { /* 诊断失败不影响主流程 */ }
+  }
+
+  // 截图保存到 screenshots/ 目录（已加入 .gitignore，不会提交）
+  async _saveScreenshot(name) {
+    try {
+      const dir = path.join(__dirname, 'screenshots');
+      fs.mkdirSync(dir, { recursive: true });
+      const safeName = (name || 'shot').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const file = path.join(dir, `${Date.now()}_${safeName}.png`);
+      await this.page.screenshot({ path: file, fullPage: false });
+      this._log(`已保存截图: ${file}`);
+      return file;
+    } catch (e) {
+      this._log(`截图失败: ${e.message}`);
+      return null;
+    }
   }
 
   _sleep(ms) {
