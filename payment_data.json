@@ -232,9 +232,45 @@
     "brand": "Saodimallsu",
     "channel": "Instagram",
     "paymentAccount": "calliecornilles@gmail.com",
-    "cooperationType": "one-time",
-    "packageInfo": null,
+    "cooperationType": "package",
+    "packageInfo": {
+      "totalFee": 1500,
+      "startMonth": "2026-08",
+      "endMonth": "2026-10",
+      "months": 3,
+      "reelsPerMonth": 1
+    },
     "collaborations": [
+      {
+        "monthKey": "2026-10",
+        "type": "paid",
+        "fee": 500,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-09",
+        "type": "paid",
+        "fee": 500,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending_Launch",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-08",
+        "type": "paid",
+        "fee": 500,
+        "orders": 28,
+        "cpa": "17.86",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
       {
         "monthKey": "2026-06",
         "type": "paid",
@@ -247,7 +283,7 @@
       }
     ],
     "createdAt": "2026-09-24T03:16:34.412Z",
-    "updatedAt": "2026-09-24T03:16:41.291Z"
+    "updatedAt": "2026-09-24T08:14:25.088Z"
   },
   {
     "id": "pay_1790219862585_9vimyq",
@@ -257,9 +293,45 @@
     "brand": "Saodimallsu",
     "channel": "Instagram",
     "paymentAccount": "mehriu01@gmail.com",
-    "cooperationType": "one-time",
-    "packageInfo": null,
+    "cooperationType": "package",
+    "packageInfo": {
+      "totalFee": 750,
+      "startMonth": "2026-08",
+      "endMonth": "2026-10",
+      "months": 3,
+      "reelsPerMonth": 1
+    },
     "collaborations": [
+      {
+        "monthKey": "2026-10",
+        "type": "paid",
+        "fee": 250,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-09",
+        "type": "paid",
+        "fee": 250,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending_Launch",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-08",
+        "type": "paid",
+        "fee": 250,
+        "orders": 277,
+        "cpa": "0.90",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
       {
         "monthKey": "2026-06",
         "type": "paid",
@@ -272,7 +344,7 @@
       }
     ],
     "createdAt": "2026-09-24T03:17:42.585Z",
-    "updatedAt": "2026-09-24T03:17:51.720Z"
+    "updatedAt": "2026-09-24T08:13:14.874Z"
   },
   {
     "id": "pay_1790219917572_law4lh",
@@ -350,7 +422,32 @@
     "updatedAt": "2026-09-24T03:23:05.848Z"
   },
   {
-    "id": "pay_1790220399104_5gdxz2",
+    "id": "pay_1790237352805_yrxc3c",
+    "influencerId": "1781148559417_3754_kubraatasoyofficial@gmail.com",
+    "email": "kubraatasoyofficial@gmail.com",
+    "name": "haileykubraatasoy",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "kubraatasoyofficial@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-06",
+        "type": "paid",
+        "fee": 300,
+        "orders": 37,
+        "cpa": "8.11",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T08:09:12.805Z",
+    "updatedAt": "2026-09-24T08:09:18.605Z"
+  },
+  {
+    "id": "pay_1790237442159_dmi8v0",
     "influencerId": "1781148559417_808_planesandprettythings@gmail.com",
     "email": "planesandprettythings@gmail.com",
     "name": "planesandprettythings",
@@ -372,7 +469,7 @@
         "fee": 3000,
         "orders": null,
         "cpa": null,
-        "paymentStatus": "Pending",
+        "paymentStatus": "Pending_Launch",
         "invoiceGenerated": false,
         "agreementGenerated": false
       },
@@ -397,7 +494,134 @@
         "agreementGenerated": false
       }
     ],
-    "createdAt": "2026-09-24T03:26:39.103Z",
-    "updatedAt": "2026-09-24T03:27:48.903Z"
+    "createdAt": "2026-09-24T08:10:42.158Z",
+    "updatedAt": "2026-09-24T08:10:47.370Z"
+  },
+  {
+    "id": "pay_1790237696317_r3n3t6",
+    "influencerId": "1785752103828_w4pjliqh",
+    "email": "CollabWithRachelBowling@gmail.com",
+    "name": "rachelbowling",
+    "brand": "Aoysky",
+    "channel": "Instagram",
+    "paymentAccount": "Rtebowling@hotmail.com",
+    "cooperationType": "package",
+    "packageInfo": {
+      "totalFee": 2100,
+      "startMonth": "2026-10",
+      "endMonth": "2026-12",
+      "months": 3,
+      "reelsPerMonth": 1
+    },
+    "collaborations": [
+      {
+        "monthKey": "2026-12",
+        "type": "paid",
+        "fee": 700,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending_Launch",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-11",
+        "type": "paid",
+        "fee": 700,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending_Launch",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-10",
+        "type": "paid",
+        "fee": 700,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending_Launch",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-08",
+        "type": "paid",
+        "fee": 700,
+        "orders": 49,
+        "cpa": "14.29",
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T08:14:56.317Z",
+    "updatedAt": "2026-09-24T08:15:36.912Z"
+  },
+  {
+    "id": "pay_1790237794982_8xcbwa",
+    "influencerId": "1781148559417_702_amyzottola@gmail.com",
+    "email": "amyzottola@gmail.com",
+    "name": "affordable_amy",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "paymentAccount": "AmyZottola@gmail.com",
+    "cooperationType": "package",
+    "packageInfo": {
+      "totalFee": 400,
+      "startMonth": "2026-09",
+      "endMonth": "2026-10",
+      "months": 2,
+      "reelsPerMonth": 1
+    },
+    "collaborations": [
+      {
+        "monthKey": "2026-10",
+        "type": "paid",
+        "fee": 200,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Pending_Launch",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      },
+      {
+        "monthKey": "2026-09",
+        "type": "paid",
+        "fee": 200,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T08:16:34.982Z",
+    "updatedAt": "2026-09-24T08:16:43.595Z"
+  },
+  {
+    "id": "pay_1790237832834_k04y68",
+    "influencerId": "1787134552506_v2jrlku6",
+    "email": "Janelle.mitchell21@gmail.com",
+    "name": "who.what.wear.ut",
+    "brand": "Aoysky",
+    "channel": "Instagram",
+    "paymentAccount": "Janelle.mitchell21@gmail.com",
+    "cooperationType": "one-time",
+    "packageInfo": null,
+    "collaborations": [
+      {
+        "monthKey": "2026-09",
+        "type": "paid",
+        "fee": 150,
+        "orders": null,
+        "cpa": null,
+        "paymentStatus": "Paid",
+        "invoiceGenerated": false,
+        "agreementGenerated": false
+      }
+    ],
+    "createdAt": "2026-09-24T08:17:12.834Z",
+    "updatedAt": "2026-09-24T08:17:18.190Z"
   }
 ]
