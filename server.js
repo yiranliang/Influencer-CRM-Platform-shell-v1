@@ -25,6 +25,26 @@ try {
 // Apify Instagram Scraper 默认搜索账号数（前端「结果数」可覆盖，范围 1-250）
 const APIFY_RESULTS_LIMIT = 10;
 
+// Discovery 去重历史（记录已见过的 username，落盘不入 git）
+const DISCOVERY_HISTORY_FILE = path.join(__dirname, 'discovery_history.json');
+const discoverySeenUsernames = new Set();
+try {
+  if (fs.existsSync(DISCOVERY_HISTORY_FILE)) {
+    const hist = JSON.parse(fs.readFileSync(DISCOVERY_HISTORY_FILE, 'utf8'));
+    (Array.isArray(hist) ? hist : []).forEach(function (u) { if (u) discoverySeenUsernames.add(String(u)); });
+  }
+} catch (e) {
+  console.warn('[Discovery] 读取去重历史失败:', e.message);
+}
+
+function saveDiscoveryHistory() {
+  try {
+    fs.writeFileSync(DISCOVERY_HISTORY_FILE, JSON.stringify([...discoverySeenUsernames], null, 2));
+  } catch (e) {
+    console.error('[Discovery] 保存去重历史失败:', e.message);
+  }
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -397,8 +417,14 @@ function createServer() {
         }
         const data = await resp.json();
         const items = Array.isArray(data) ? data : [];
-        console.log('[discovery-search] 返回', items.length, '条结果');
-        sendJSON(res, 200, { success: true, data: items });
+        // 去重：过滤已见过的 username，新账号加入历史并落盘
+        const rawCount = items.length;
+        const fresh = items.filter(it => it && it.username && !discoverySeenUsernames.has(it.username));
+        fresh.forEach(it => discoverySeenUsernames.add(it.username));
+        saveDiscoveryHistory();
+        const dropped = rawCount - fresh.length;
+        console.log('[discovery-search] 返回', rawCount, '条，新账号', fresh.length, '个，过滤重复', dropped, '个');
+        sendJSON(res, 200, { success: true, data: fresh, total: rawCount, newCount: fresh.length, dropped: dropped });
       } catch (err) {
         clearTimeout(timer);
         console.error('[discovery-search] 请求错误:', err.name, err.message);
@@ -406,6 +432,15 @@ function createServer() {
         sendJSON(res, 500, { success: false, error: msg });
       }
     }).catch(err => sendJSON(res, 400, { error: err.message }));
+    return;
+  }
+
+  // POST /api/discovery-clear-history — 清空去重历史
+  if (pathname === '/api/discovery-clear-history' && req.method === 'POST') {
+    discoverySeenUsernames.clear();
+    try { if (fs.existsSync(DISCOVERY_HISTORY_FILE)) fs.unlinkSync(DISCOVERY_HISTORY_FILE); } catch (e) {}
+    console.log('[discovery-search] 去重历史已清空');
+    sendJSON(res, 200, { success: true });
     return;
   }
 

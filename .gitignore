@@ -19,6 +19,7 @@ screenshots/
 .DS_Store
 *.log
 backups/
+discovery_history.json
 
 # ========== 编辑器 / AI 工具 ==========
 .claude/

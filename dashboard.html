@@ -1975,6 +1975,7 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:12px;">
                     <div id="discoveryCount" style="font-size:13px;color:#64748b;">已选 0 个</div>
                     <div style="display:flex;gap:8px;">
+                        <button class="btn-secondary" onclick="discoveryClearHistory()">清空历史</button>
                         <button class="btn-secondary" onclick="discoveryClearResults()">清空结果</button>
                         <button class="btn-primary" onclick="discoveryAddSelectedToOutreach()">加入红人库</button>
                     </div>
@@ -8756,10 +8757,11 @@ function discoverySearch() {
             discoveryResults = Array.isArray(data.data) ? data.data : [];
             discoverySelected.clear();
             discoveryRenderTable();
-            if (discoveryResults.length === 0) {
+            var dropped = data.dropped || 0;
+            if (discoveryResults.length === 0 && dropped === 0) {
                 statusEl.innerText = '未找到结果，试试别的关键词或类型';
             } else {
-                statusEl.innerText = '找到 ' + discoveryResults.length + ' 个结果';
+                statusEl.innerText = '本次找到 ' + discoveryResults.length + ' 个新账号（已自动过滤 ' + dropped + ' 个重复）';
             }
         } else {
             statusEl.innerText = '搜索失败';
@@ -8863,6 +8865,16 @@ function discoveryClearResults() {
     discoverySelected.clear();
     discoveryRenderTable();
     document.getElementById('discoveryStatus').innerText = '';
+}
+
+function discoveryClearHistory() {
+    fetch('/api/discovery-clear-history', { method: 'POST' })
+    .then(function(resp) { return resp.json(); })
+    .then(function(d) {
+        if (d && d.success) showToast('去重历史已清空', 'success');
+        else showToast('清空失败', 'error');
+    })
+    .catch(function(err) { showToast('清空失败：' + err.message, 'error'); });
 }
 
 function discoveryAddSelectedToOutreach() {
