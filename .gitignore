@@ -25,5 +25,5 @@ backups/
 .idea/
 
 # ========== 垃圾文件 ==========
-*hboard.html*
+hboard.html*
 *弹出*
