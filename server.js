@@ -464,10 +464,13 @@ function startServer(port) {
   server.listen(port, () => {
     console.log(`AI Workflow 2.0 server running at http://localhost:${port}`);
 
-    import('child_process').then(({ exec }) => {
-      const startCmd = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open';
-      exec(`${startCmd} http://localhost:${port}/dashboard.html`);
-    });
+    // 测试环境可用 NO_AUTO_OPEN=1 跳过自动打开浏览器（正常启动不受影响）
+    if (process.env.NO_AUTO_OPEN !== '1') {
+      import('child_process').then(({ exec }) => {
+        const startCmd = process.platform === 'win32' ? 'start' : process.platform === 'darwin' ? 'open' : 'xdg-open';
+        exec(`${startCmd} http://localhost:${port}/dashboard.html`);
+      });
+    }
   }).once('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.log(`端口 ${port} 被占用，自动尝试端口 ${port + 1}`);
