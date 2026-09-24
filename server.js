@@ -504,6 +504,63 @@ function createServer() {
     return;
   }
 
+  // POST /api/discovery-add-to-outreach — 把 Discovery 勾选的账号写入红人库（influencer_data.json）
+  if (pathname === '/api/discovery-add-to-outreach' && req.method === 'POST') {
+    parseBody(req).then((body) => {
+      try {
+        const accounts = Array.isArray(body.accounts) ? body.accounts : [];
+        if (accounts.length === 0) { sendJSON(res, 400, { success: false, error: '没有要加入的账号' }); return; }
+
+        // 读现有红人库（Outreach），收集已有 name（小写）用于查重 —— 必须查这里，不是只查 discovery_history
+        let influencers = [];
+        if (fs.existsSync(INFLUENCER_DATA_FILE)) {
+          const raw = JSON.parse(fs.readFileSync(INFLUENCER_DATA_FILE, 'utf8'));
+          influencers = Array.isArray(raw) ? raw : [];
+        }
+        const existingNames = new Set();
+        influencers.forEach(function (it) { if (it && it.name) existingNames.add(String(it.name).toLowerCase()); });
+
+        const now = new Date();
+        const dateStr = now.getFullYear() + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + String(now.getDate()).padStart(2, '0');
+
+        let added = 0;
+        const skippedNames = [];
+        accounts.forEach(function (acct) {
+          if (!acct || !acct.username) return;
+          const uname = String(acct.username);
+          if (existingNames.has(uname.toLowerCase())) {
+            skippedNames.push(uname);
+            return;
+          }
+          const bio = String(acct.biography || '').slice(0, 50);
+          const verified = acct.verified ? '是' : '否';
+          const note = '粉丝: ' + (acct.followersCount || 0) + ' | 帖子: ' + (acct.postsCount || 0) + ' | 认证: ' + verified + ' | 简介: ' + bio;
+          const id = Date.now() + '_' + Math.random().toString(36).substr(2, 8) + '_' + uname;
+          influencers.push({
+            date: dateStr,
+            name: uname,
+            email: '',
+            brand: '',
+            channel: 'Instagram',
+            status: 'Connected',
+            note: note,
+            id: id
+          });
+          existingNames.add(uname.toLowerCase());
+          added++;
+        });
+
+        fs.writeFileSync(INFLUENCER_DATA_FILE, JSON.stringify(influencers, null, 2));
+        console.log('[discovery-add] 加入 %d 个，跳过 %d 个（已存在）', added, skippedNames.length);
+        sendJSON(res, 200, { success: true, added: added, skipped: skippedNames.length, skippedNames: skippedNames });
+      } catch (err) {
+        console.error('[discovery-add] 错误:', err.message);
+        sendJSON(res, 500, { success: false, error: err.message });
+      }
+    }).catch(err => sendJSON(res, 400, { error: err.message }));
+    return;
+  }
+
   // GET /api/email-config — 返回邮件标题配置
   if (pathname === '/api/email-config' && req.method === 'GET') {
     try {

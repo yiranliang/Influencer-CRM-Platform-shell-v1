@@ -8883,7 +8883,35 @@ function discoveryClearHistory() {
 
 function discoveryAddSelectedToOutreach() {
     if (discoverySelected.size === 0) { showToast('请先勾选要加入的红人', 'error'); return; }
-    showToast('已选中 ' + discoverySelected.size + ' 个（入库功能待接入后端）', 'info');
+    // 从 discoveryResults 里收集勾选的账号
+    var accounts = discoveryResults.filter(function(r) { return discoverySelected.has(r.username); }).map(function(r) {
+        return {
+            username: r.username,
+            followersCount: r.followersCount,
+            postsCount: r.postsCount,
+            biography: r.biography,
+            verified: r.verified
+        };
+    });
+    fetch('/api/discovery-add-to-outreach', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accounts: accounts })
+    }).then(function(resp) { return resp.json(); })
+    .then(function(data) {
+        if (data && data.success) {
+            var added = data.added || 0;
+            var skipped = data.skipped || 0;
+            showToast('成功加入 ' + added + ' 个，跳过 ' + skipped + ' 个（已存在）', 'success');
+            if (skipped > 0 && data.skippedNames) {
+                console.log('跳过的用户名:', data.skippedNames);
+            }
+        } else {
+            showToast((data && data.error) || '加入失败', 'error');
+        }
+    }).catch(function(err) {
+        showToast('请求失败：' + err.message, 'error');
+    });
 }
 
 </script>
