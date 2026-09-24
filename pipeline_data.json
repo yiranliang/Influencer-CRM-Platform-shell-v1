@@ -4727,7 +4727,7 @@
     "totalFulfilledQty": 0,
     "archived": false,
     "pipelineNote": "",
-    "fulfilledQty": 1,
+    "fulfilledQty": 5,
     "isFullyFulfilled": false,
     "overdueDays": 11,
     "favorited": false
@@ -4746,7 +4746,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "archived": false,
-    "pipelineNote": "",
+    "pipelineNote": "发在TK上了",
     "fulfilledQty": 2,
     "isFullyFulfilled": false,
     "overdueDays": 22,
