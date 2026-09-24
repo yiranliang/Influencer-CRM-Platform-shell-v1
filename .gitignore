@@ -26,4 +26,5 @@ backups/
 
 # ========== 垃圾文件 ==========
 hboard.html*
-*弹出*start.bat
+*弹出*
+start.bat
