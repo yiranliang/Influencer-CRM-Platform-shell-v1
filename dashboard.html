@@ -1416,6 +1416,10 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                 Payment
             </div>
+            <div class="nav-item" data-page="discovery">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Discovery
+            </div>
             <div class="nav-item" data-page="settings">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                 Settings
@@ -1909,6 +1913,70 @@
                 <select class="page-size-select" id="paymentPageSize" onchange="changePaymentPageSize()">
                     <option value="10">10条/页</option><option value="20" selected>20条/页</option><option value="50">50条/页</option><option value="100">100条/页</option>
                 </select>
+            </div>
+        </div>
+
+        <!-- Discovery 页面 -->
+        <div id="page-discovery" class="page-content">
+            <h2 class="page-title">Discovery - 红人发现</h2>
+            <div class="card">
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">
+                    <select id="discoverySearchType" class="payment-status-filter" style="min-width:130px;">
+                        <option value="profile">关键词搜用户</option>
+                        <option value="hashtag">话题标签</option>
+                        <option value="url">已知 URL 抓取</option>
+                    </select>
+                    <div class="search-wrapper" style="flex:1;min-width:260px;">
+                        <input type="text" id="discoveryKeyword" class="search-input" style="width:100%;" placeholder="输入关键词，如 yoga、fitness..." onkeydown="if(event.key==='Enter'){discoverySearch();}">
+                        <span class="search-icon">🔍</span>
+                        <span class="search-clear" onclick="clearSearch('discoveryKeyword')">×</span>
+                    </div>
+                    <button class="btn-primary" onclick="discoverySearch()">搜索</button>
+                </div>
+
+                <div style="font-size:13px;color:#64748b;margin-bottom:12px;">
+                    搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。
+                </div>
+
+                <div class="filter-bar" style="gap:12px;flex-wrap:wrap;">
+                    <label style="font-size:13px;color:#475569;">粉丝数：</label>
+                    <input type="number" id="discoveryMinFollowers" placeholder="最小" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                    <span style="color:#94a3b8;">~</span>
+                    <input type="number" id="discoveryMaxFollowers" placeholder="最大" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                    <label style="font-size:13px;color:#475569;margin-left:8px;">仅认证：</label>
+                    <input type="checkbox" id="discoveryVerifiedOnly" style="cursor:pointer;">
+                    <button class="btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="discoveryApplyFilter()">应用筛选</button>
+                    <button class="btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="discoveryClearFilter()">清空</button>
+                </div>
+
+                <div id="discoveryStatus" style="font-size:13px;color:#94a3b8;margin:12px 0;"></div>
+
+                <div style="overflow-x:auto;">
+                    <table class="cd-table" style="min-width:900px;">
+                        <thead>
+                            <tr>
+                                <th style="width:40px;"><input type="checkbox" id="discoverySelectAll" onclick="discoveryToggleSelectAll()"></th>
+                                <th>用户名</th>
+                                <th>粉丝数</th>
+                                <th>帖子数</th>
+                                <th>简介</th>
+                                <th>认证</th>
+                                <th style="width:90px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="discoveryTableBody">
+                            <tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">输入关键词开始搜索</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:12px;">
+                    <div id="discoveryCount" style="font-size:13px;color:#64748b;">已选 0 个</div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn-secondary" onclick="discoveryClearResults()">清空结果</button>
+                        <button class="btn-primary" onclick="discoveryAddSelectedToOutreach()">加入红人库</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -8659,6 +8727,124 @@
     }
 
     loadPaymentData();
+
+// ========== Discovery 红人搜索（UI 骨架，暂用 mock 数据）==========
+var discoveryResults = [];
+var discoverySelected = new Set();
+
+function discoverySearch() {
+    var keyword = document.getElementById('discoveryKeyword').value.trim();
+    var type = document.getElementById('discoverySearchType').value;
+    if (!keyword) { showToast('请输入关键词', 'error'); return; }
+    document.getElementById('discoveryStatus').innerText = '搜索中...（当前为演示数据，未接入 Apify）';
+    setTimeout(function() {
+        discoveryResults = [
+            { username: keyword + '_fashion', followersCount: 45000, postsCount: 320, biography: 'Fashion & lifestyle creator based in LA', verified: false },
+            { username: keyword + '_daily', followersCount: 128000, postsCount: 890, biography: 'Daily ' + keyword + ' content', verified: true },
+            { username: keyword + '_world', followersCount: 8200, postsCount: 140, biography: 'Micro influencer | ' + keyword, verified: false }
+        ];
+        discoverySelected.clear();
+        discoveryRenderTable();
+        document.getElementById('discoveryStatus').innerText = '找到 ' + discoveryResults.length + ' 个结果（演示数据）';
+    }, 500);
+}
+
+function discoveryRenderTable() {
+    var tbody = document.getElementById('discoveryTableBody');
+    if (!tbody) return;
+    if (discoveryResults.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">无结果</td></tr>';
+        document.getElementById('discoveryCount').innerText = '已选 0 个';
+        return;
+    }
+    var html = '';
+    discoveryResults.forEach(function(r) {
+        var checked = discoverySelected.has(r.username) ? ' checked' : '';
+        html += '<tr>' +
+            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username) + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
+            '<td><span class="copy-cell">' + escHTML(r.username) + '</span></td>' +
+            '<td>' + (r.followersCount || 0).toLocaleString() + '</td>' +
+            '<td>' + (r.postsCount || 0) + '</td>' +
+            '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
+            '<td>' + (r.verified ? '✅' : '-') + '</td>' +
+            '<td><a href="https://instagram.com/' + escAttr(r.username) + '" target="_blank" class="payment-action-btn">查看</a></td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+    document.getElementById('discoveryCount').innerText = '已选 ' + discoverySelected.size + ' 个';
+}
+
+function discoveryToggleRow(cb) {
+    var u = cb.getAttribute('data-username');
+    if (cb.checked) discoverySelected.add(u); else discoverySelected.delete(u);
+    document.getElementById('discoveryCount').innerText = '已选 ' + discoverySelected.size + ' 个';
+    discoveryUpdateSelectAll();
+}
+
+function discoveryToggleSelectAll() {
+    var checked = document.getElementById('discoverySelectAll').checked;
+    discoverySelected.clear();
+    if (checked) discoveryResults.forEach(function(r) { discoverySelected.add(r.username); });
+    document.querySelectorAll('.discovery-row-cb').forEach(function(cb) { cb.checked = checked; });
+    document.getElementById('discoveryCount').innerText = '已选 ' + discoverySelected.size + ' 个';
+}
+
+function discoveryUpdateSelectAll() {
+    var cbs = document.querySelectorAll('.discovery-row-cb');
+    var all = cbs.length > 0;
+    cbs.forEach(function(cb) { if (!cb.checked) all = false; });
+    var sa = document.getElementById('discoverySelectAll');
+    if (sa) sa.checked = all;
+}
+
+function discoveryApplyFilter() {
+    var min = parseInt(document.getElementById('discoveryMinFollowers').value) || 0;
+    var max = parseInt(document.getElementById('discoveryMaxFollowers').value) || Infinity;
+    var verifiedOnly = document.getElementById('discoveryVerifiedOnly').checked;
+    var list = discoveryResults.filter(function(r) {
+        if ((r.followersCount || 0) < min || (r.followersCount || 0) > max) return false;
+        if (verifiedOnly && !r.verified) return false;
+        return true;
+    });
+    var tbody = document.getElementById('discoveryTableBody');
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">无匹配结果</td></tr>';
+        return;
+    }
+    var html = '';
+    list.forEach(function(r) {
+        var checked = discoverySelected.has(r.username) ? ' checked' : '';
+        html += '<tr>' +
+            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username) + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
+            '<td><span class="copy-cell">' + escHTML(r.username) + '</span></td>' +
+            '<td>' + (r.followersCount || 0).toLocaleString() + '</td>' +
+            '<td>' + (r.postsCount || 0) + '</td>' +
+            '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
+            '<td>' + (r.verified ? '✅' : '-') + '</td>' +
+            '<td><a href="https://instagram.com/' + escAttr(r.username) + '" target="_blank" class="payment-action-btn">查看</a></td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+function discoveryClearFilter() {
+    document.getElementById('discoveryMinFollowers').value = '';
+    document.getElementById('discoveryMaxFollowers').value = '';
+    document.getElementById('discoveryVerifiedOnly').checked = false;
+    discoveryRenderTable();
+}
+
+function discoveryClearResults() {
+    discoveryResults = [];
+    discoverySelected.clear();
+    discoveryRenderTable();
+    document.getElementById('discoveryStatus').innerText = '';
+}
+
+function discoveryAddSelectedToOutreach() {
+    if (discoverySelected.size === 0) { showToast('请先勾选要加入的红人', 'error'); return; }
+    showToast('已选中 ' + discoverySelected.size + ' 个（入库功能待接入后端）', 'info');
+}
 
 </script>
 <!-- Outreach 筛选下拉菜单（body 层级 + fixed 定位，避免被滚动容器裁剪） -->
