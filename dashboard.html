@@ -1931,6 +1931,8 @@
                         <span class="search-icon">🔍</span>
                         <span class="search-clear" onclick="clearSearch('discoveryKeyword')">×</span>
                     </div>
+                    <label style="font-size:13px;color:#475569;white-space:nowrap;">结果数</label>
+                    <input type="number" id="discoveryResultsLimit" value="20" min="1" max="100" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
                 </div>
 
@@ -8735,6 +8737,9 @@ var discoverySelected = new Set();
 function discoverySearch() {
     var keyword = document.getElementById('discoveryKeyword').value.trim();
     var type = document.getElementById('discoverySearchType').value;
+    var limit = parseInt(document.getElementById('discoveryResultsLimit').value, 10);
+    if (isNaN(limit) || limit < 1) limit = 20;
+    if (limit > 100) limit = 100;
     if (!keyword) { showToast('请输入关键词', 'error'); return; }
     var btn = document.getElementById('discoverySearchBtn');
     var statusEl = document.getElementById('discoveryStatus');
@@ -8743,7 +8748,7 @@ function discoverySearch() {
     fetch('/api/discovery-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: keyword, searchType: type })
+        body: JSON.stringify({ keyword: keyword, searchType: type, resultsLimit: limit })
     }).then(function(resp) { return resp.json(); })
     .then(function(data) {
         if (btn) btn.disabled = false;

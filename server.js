@@ -22,7 +22,7 @@ try {
   console.warn('[Apify] 未找到 apify_config.json 或解析失败');
 }
 
-// Apify Instagram Scraper 单次抓取条数上限（省额度）
+// Apify Instagram Scraper 默认结果条数（前端「结果数」可覆盖，上限 100）
 const APIFY_RESULTS_LIMIT = 20;
 
 const MIME = {
@@ -352,18 +352,21 @@ function createServer() {
     parseBody(req).then(async (body) => {
       const keyword = (body.keyword || '').trim();
       const searchType = body.searchType || 'profile';
+      let limit = parseInt(body.resultsLimit, 10);
+      if (isNaN(limit) || limit < 1) limit = APIFY_RESULTS_LIMIT;
+      if (limit > 100) limit = 100;
       if (!keyword) { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
 
-      // 组装 Apify 请求体
+      // 组装 Apify 请求体（搜索场景用 searchLimit 才能真正限制返回用户数）
       let apifyBody;
       if (searchType === 'url') {
-        apifyBody = { directUrls: [keyword], resultsType: 'details', resultsLimit: APIFY_RESULTS_LIMIT };
+        apifyBody = { directUrls: [keyword], resultsType: 'details', resultsLimit: limit };
       } else {
         apifyBody = {
           search: keyword,
           searchType: searchType === 'hashtag' ? 'hashtag' : 'user',
-          searchLimit: APIFY_RESULTS_LIMIT,
+          searchLimit: limit,
           resultsType: 'details'
         };
       }
@@ -371,10 +374,10 @@ function createServer() {
       // 打印请求参数（Token 打码，不泄露完整凭证）
       const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
       console.log('[discovery-search] keyword=%s, type=%s -> %s, limit=%d, token=%s',
-        keyword, searchType, searchType === 'url' ? 'directUrls' : apifyBody.searchType, APIFY_RESULTS_LIMIT, maskedToken);
+        keyword, searchType, searchType === 'url' ? 'directUrls' : apifyBody.searchType, limit, maskedToken);
 
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 180000);
+      const timer = setTimeout(() => controller.abort(), 290000);
       try {
         const resp = await fetch(
           'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN),
@@ -399,7 +402,7 @@ function createServer() {
       } catch (err) {
         clearTimeout(timer);
         console.error('[discovery-search] 请求错误:', err.name, err.message);
-        const msg = (err && err.name === 'AbortError') ? 'Apify 请求超时（180s）' : (err.message || '请求失败');
+        const msg = (err && err.name === 'AbortError') ? 'Apify 请求超时（约 5 分钟）' : (err.message || '请求失败');
         sendJSON(res, 500, { success: false, error: msg });
       }
     }).catch(err => sendJSON(res, 400, { error: err.message }));
