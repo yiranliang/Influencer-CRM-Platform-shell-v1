@@ -369,6 +369,17 @@ function createServer() {
     parseBody(req).then(async (body) => {
       const keyword = (body.keyword || '').trim();
       const searchType = body.searchType || 'hashtag';
+      // 额外话题标签（可选，最多 5 个）：每个标签都有各自的第一页，合并起来绕开免费版单标签约 24 条的限制
+      const extraHashtags = [];
+      const mainTag = keyword.replace(/^#/, '').toLowerCase();
+      (Array.isArray(body.extraHashtags) ? body.extraHashtags : []).forEach(function (t) {
+        const tag = String(t || '').trim().replace(/^#/, '');
+        if (!tag) return;
+        if (extraHashtags.length >= 5) return; // 最多 5 个额外标签
+        if (tag.toLowerCase() === mainTag) return; // 去重主关键词
+        if (extraHashtags.some(function (x) { return x.toLowerCase() === tag.toLowerCase(); })) return; // 去重自身重复
+        extraHashtags.push(tag);
+      });
       let limit = parseInt(body.resultsLimit, 10);
       if (isNaN(limit) || limit < 10) limit = APIFY_RESULTS_LIMIT; // 默认 30
       if (limit > 100) limit = 100;
@@ -416,6 +427,7 @@ function createServer() {
         let postsCount = 0;   // 第 1 步抓到的帖子数（URL 模式为 0）
         let derivedCount = 0; // 从帖子反推出的去重账号数
         let droppedInLibrary = 0; // 过滤掉的红人库已有账号
+        let hashtagCount = 0;     // 本次搜索合并的话题标签数（URL 模式为 0）
 
         const influencerNames = loadInfluencerNames();
 
@@ -424,8 +436,10 @@ function createServer() {
           profiles = await callApify(APIFY_DETAILS_ACTOR, { directUrls: [keyword], resultsType: 'details', addProfileStatistics: true }, 'URL抓取');
         } else {
           // 话题标签：第 1 步用官方 Hashtag Scraper 抓最近发布的帖子，第 2 步反推创作者详情
+          const hashtags = [keyword.replace(/^#/, ''), ...extraHashtags];
+          hashtagCount = hashtags.length;
           const step1Body = {
-            hashtags: [keyword.replace(/^#/, '')],
+            hashtags: hashtags,
             resultsType: 'posts',
             resultsLimit: limit
           };
@@ -433,7 +447,7 @@ function createServer() {
           postsCount = posts.length;
           const usernames = [...new Set(posts.map(p => p && p.ownerUsername).filter(Boolean))];
           derivedCount = usernames.length;
-          console.log('[discovery-search] 第1步抓了 %d 条帖子，提取到 %d 个去重用户名', postsCount, derivedCount);
+          console.log('[discovery-search] 第1步抓了 %d 条帖子（%d 个标签），提取到 %d 个去重用户名', postsCount, hashtagCount, derivedCount);
 
           // 优化：第 2 步抓详情之前，先过滤掉已在红人库的用户名，避免为重复账号花钱抓详情
           const newUsernames = [];
@@ -487,7 +501,8 @@ function createServer() {
           dropped: dropped,
           droppedInLibrary: droppedInLibrary,
           postsCount: postsCount,
-          derivedCount: derivedCount
+          derivedCount: derivedCount,
+          hashtagCount: hashtagCount
         });
       } catch (err) {
         console.error('[discovery-search] 错误:', err.message);

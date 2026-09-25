@@ -1940,6 +1940,11 @@
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
                 </div>
 
+                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+                    <label style="font-size:13px;color:#475569;white-space:nowrap;">额外标签（可选，逗号分隔）</label>
+                    <input type="text" id="discoveryExtraHashtags" style="flex:1;min-width:260px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;" placeholder="如 amazonfashionfinds, amazonmusthaves（最多 5 个）">
+                </div>
+
                 <div id="apifyUsage" style="font-size:12px;color:#64748b;margin-bottom:8px;">Apify 额度：加载中…</div>
 
                 <div style="font-size:13px;color:#64748b;margin-bottom:12px;">
@@ -8749,6 +8754,7 @@ var discoveryDropped = 0;
 var discoveryDroppedInLibrary = 0;
 var discoveryPostsCount = 0;
 var discoveryDerivedCount = 0;
+var discoveryHashtagCount = 0;
 
 function loadApifyUsage() {
     var el = document.getElementById('apifyUsage');
@@ -8774,6 +8780,11 @@ function discoverySearch() {
     if (isNaN(limit) || limit < 10) limit = 30;
     if (limit > 100) limit = 100;
     if (!keyword) { showToast('请输入话题标签或 URL', 'error'); return; }
+    var extraHashtags = [];
+    var extraRaw = (document.getElementById('discoveryExtraHashtags').value || '').trim();
+    if (extraRaw) {
+        extraHashtags = extraRaw.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+    }
     var btn = document.getElementById('discoverySearchBtn');
     var statusEl = document.getElementById('discoveryStatus');
     statusEl.innerText = '搜索中，请稍候（约 30 秒 - 2 分钟）...';
@@ -8781,7 +8792,7 @@ function discoverySearch() {
     fetch('/api/discovery-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: keyword, searchType: type, resultsLimit: limit })
+        body: JSON.stringify({ keyword: keyword, searchType: type, resultsLimit: limit, extraHashtags: extraHashtags })
     }).then(function(resp) { return resp.json(); })
     .then(function(data) {
         if (btn) btn.disabled = false;
@@ -8793,6 +8804,7 @@ function discoverySearch() {
             discoveryDroppedInLibrary = data.droppedInLibrary || 0;
             discoveryPostsCount = data.postsCount || 0;
             discoveryDerivedCount = data.derivedCount || 0;
+            discoveryHashtagCount = data.hashtagCount || 0;
             discoveryApplyFilter();
             loadApifyUsage();
         } else {
@@ -8860,9 +8872,12 @@ function discoveryUpdateStatus() {
     var statusEl = document.getElementById('discoveryStatus');
     if (!statusEl) return;
     var total = discoveryResults.length;
-    var prefix = (discoveryPostsCount > 0)
-        ? '抓了 ' + discoveryPostsCount + ' 条帖子，反推出 ' + discoveryDerivedCount + ' 个不同账号；'
-        : '';
+    var prefix = '';
+    if (discoveryPostsCount > 0) {
+        prefix = '抓了 ' + discoveryPostsCount + ' 条帖子';
+        if (discoveryHashtagCount > 1) prefix += '（来自 ' + discoveryHashtagCount + ' 个标签）';
+        prefix += '，反推出 ' + discoveryDerivedCount + ' 个不同账号；';
+    }
     if (total === 0 && discoveryDropped === 0) {
         statusEl.innerText = prefix + '未找到结果，试试别的关键词或类型';
         return;
@@ -8943,6 +8958,7 @@ function discoveryClearResults() {
     discoveryDroppedInLibrary = 0;
     discoveryPostsCount = 0;
     discoveryDerivedCount = 0;
+    discoveryHashtagCount = 0;
     discoveryRenderTable();
     document.getElementById('discoveryStatus').innerText = '';
 }
