@@ -435,6 +435,10 @@ function createServer() {
         let profiles = []; // 最终返回的账号详情数组
         let postsCount = 0;   // 第 1 步抓到的帖子数（URL 模式为 0）
         let derivedCount = 0; // 从帖子反推出的去重账号数
+        let droppedInHistory = 0; // 过滤掉的历史已有账号
+        let droppedInLibrary = 0; // 过滤掉的红人库已有账号
+
+        const influencerNames = loadInfluencerNames();
 
         if (searchType === 'url') {
           // URL 精确抓取：直接抓账号详情
@@ -452,7 +456,17 @@ function createServer() {
           derivedCount = usernames.length;
           console.log('[discovery-search] 第1步抓了 %d 条帖子，提取到 %d 个去重用户名', postsCount, derivedCount);
 
-          const topUsernames = usernames.slice(0, 30);
+          // 优化：第 2 步抓详情之前，先过滤掉已在历史/红人库的用户名，避免为重复账号花钱抓详情
+          const newUsernames = [];
+          usernames.forEach(function (u) {
+            const uname = String(u).toLowerCase();
+            if (discoverySeenUsernames.has(uname)) { droppedInHistory++; return; }
+            if (influencerNames.has(uname)) { droppedInLibrary++; return; }
+            newUsernames.push(u);
+          });
+          console.log('[discovery-search] 过滤后剩 %d 个新用户名（历史 %d + 红人库 %d）', newUsernames.length, droppedInHistory, droppedInLibrary);
+
+          const topUsernames = newUsernames.slice(0, 30);
           if (topUsernames.length > 0) {
             const step2Body = {
               directUrls: topUsernames.map(u => 'https://www.instagram.com/' + u + '/'),
@@ -467,24 +481,30 @@ function createServer() {
               profiles = topUsernames.map(u => ({ username: u }));
             }
           }
+          // 本次抓过详情的用户名记入历史，之后不再重复抓
+          topUsernames.forEach(function (u) { discoverySeenUsernames.add(String(u).toLowerCase()); });
+          saveDiscoveryHistory();
         }
 
-        // 去重：同时过滤「搜索历史见过的 username」和「红人库已有的红人」。
-        // 用户名统一转小写再比，避免 Yoga_xxx / yoga_xxx 被当成不同人。
+        // 去掉无用户名的脏数据（第 2 步偶尔返回空项）；URL 模式仍需在这里做历史/红人库去重
         const rawCount = profiles.length;
-        const influencerNames = loadInfluencerNames();
-        let droppedInHistory = 0;
-        let droppedInLibrary = 0;
         const fresh = [];
-        profiles.forEach(function (it) {
-          if (!it || !it.username) return;
-          const uname = String(it.username).toLowerCase();
-          if (discoverySeenUsernames.has(uname)) { droppedInHistory++; return; }
-          if (influencerNames.has(uname)) { droppedInLibrary++; return; }
-          fresh.push(it);
-          discoverySeenUsernames.add(uname);
-        });
-        saveDiscoveryHistory();
+        if (searchType === 'url') {
+          profiles.forEach(function (it) {
+            if (!it || !it.username) return;
+            const uname = String(it.username).toLowerCase();
+            if (discoverySeenUsernames.has(uname)) { droppedInHistory++; return; }
+            if (influencerNames.has(uname)) { droppedInLibrary++; return; }
+            fresh.push(it);
+            discoverySeenUsernames.add(uname);
+          });
+          saveDiscoveryHistory();
+        } else {
+          profiles.forEach(function (it) {
+            if (it && it.username) fresh.push(it);
+          });
+        }
+
         const dropped = droppedInHistory + droppedInLibrary;
         console.log('[discovery-search] 最终新账号 %d 个（过滤 %d 个：历史 %d + 红人库 %d）', fresh.length, dropped, droppedInHistory, droppedInLibrary);
         sendJSON(res, 200, {

@@ -8986,6 +8986,7 @@ function discoveryAddSelectedToOutreach() {
             if (skipped > 0 && data.skippedNames) {
                 console.log('跳过的用户名:', data.skippedNames);
             }
+            loadInfluencers(); // 刷新 Outreach，切过去就能看到新账号
         } else {
             showToast((data && data.error) || '加入失败', 'error');
         }
