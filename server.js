@@ -23,7 +23,7 @@ try {
 }
 
 // Discovery 默认抓取帖子数（话题标签模式，前端「结果数」可覆盖，范围 10-100）
-const APIFY_RESULTS_LIMIT = 50;
+const APIFY_RESULTS_LIMIT = 30;
 
 // Discovery 去重历史（记录已见过的 username，落盘不入 git）
 const DISCOVERY_HISTORY_FILE = path.join(__dirname, 'discovery_history.json');
