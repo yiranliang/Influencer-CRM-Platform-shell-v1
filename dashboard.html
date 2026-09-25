@@ -1986,7 +1986,6 @@
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;flex-wrap:wrap;gap:12px;">
                     <div id="discoveryCount" style="font-size:13px;color:#64748b;">已选 0 个</div>
                     <div style="display:flex;gap:8px;">
-                        <button class="btn-secondary" onclick="discoveryClearHistory()">清空历史</button>
                         <button class="btn-secondary" onclick="discoveryClearResults()">清空结果</button>
                         <button class="btn-primary" onclick="discoveryAddSelectedToOutreach()">加入红人库</button>
                     </div>
@@ -8747,7 +8746,6 @@
 var discoveryResults = [];
 var discoverySelected = new Set();
 var discoveryDropped = 0;
-var discoveryDroppedInHistory = 0;
 var discoveryDroppedInLibrary = 0;
 var discoveryPostsCount = 0;
 var discoveryDerivedCount = 0;
@@ -8792,7 +8790,6 @@ function discoverySearch() {
             discoveryResults.sort(function(a, b) { return (b.followersCount || 0) - (a.followersCount || 0); });
             discoverySelected.clear();
             discoveryDropped = data.dropped || 0;
-            discoveryDroppedInHistory = data.droppedInHistory || 0;
             discoveryDroppedInLibrary = data.droppedInLibrary || 0;
             discoveryPostsCount = data.postsCount || 0;
             discoveryDerivedCount = data.derivedCount || 0;
@@ -8881,7 +8878,7 @@ function discoveryUpdateStatus() {
     if (discoveryDropped === 0) {
         statusEl.innerText = prefix + '本次找到 ' + total + ' 个新账号' + stats;
     } else {
-        statusEl.innerText = prefix + '本次找到 ' + total + ' 个新账号（已过滤 ' + discoveryDropped + ' 个重复，其中 ' + discoveryDroppedInHistory + ' 个在搜索历史、' + discoveryDroppedInLibrary + ' 个已在红人库）' + stats;
+        statusEl.innerText = prefix + '本次找到 ' + total + ' 个新账号（已过滤 ' + discoveryDropped + ' 个，其中 ' + discoveryDroppedInLibrary + ' 个已在红人库）' + stats;
     }
 }
 
@@ -8943,22 +8940,11 @@ function discoveryClearResults() {
     discoveryResults = [];
     discoverySelected.clear();
     discoveryDropped = 0;
-    discoveryDroppedInHistory = 0;
     discoveryDroppedInLibrary = 0;
     discoveryPostsCount = 0;
     discoveryDerivedCount = 0;
     discoveryRenderTable();
     document.getElementById('discoveryStatus').innerText = '';
-}
-
-function discoveryClearHistory() {
-    fetch('/api/discovery-clear-history', { method: 'POST' })
-    .then(function(resp) { return resp.json(); })
-    .then(function(d) {
-        if (d && d.success) showToast('去重历史已清空', 'success');
-        else showToast('清空失败', 'error');
-    })
-    .catch(function(err) { showToast('清空失败：' + err.message, 'error'); });
 }
 
 function discoveryAddSelectedToOutreach() {
