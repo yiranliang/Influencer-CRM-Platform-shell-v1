@@ -396,15 +396,19 @@ function createServer() {
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
 
       const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
-      const APIFY_URL = 'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN);
+      const APIFY_DETAILS_ACTOR = 'apify~instagram-scraper';
+      const APIFY_HASHTAG_ACTOR = 'apify~instagram-hashtag-scraper';
+      function apifyUrl(actorId) {
+        return 'https://api.apify.com/v2/acts/' + actorId + '/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN);
+      }
 
       // 调一次 Apify（每步独立超时，token 打码打印请求体）
-      async function callApify(apifyBody, label) {
+      async function callApify(actorId, apifyBody, label) {
         console.log('[discovery-search] %s 请求体: %s (token=%s)', label, JSON.stringify(apifyBody), maskedToken);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 290000);
         try {
-          const resp = await fetch(APIFY_URL, {
+          const resp = await fetch(apifyUrl(actorId), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(apifyBody),
@@ -432,16 +436,15 @@ function createServer() {
 
         if (searchType === 'url') {
           // URL 精确抓取：直接抓账号详情
-          profiles = await callApify({ directUrls: [keyword], resultsType: 'details', addProfileStatistics: true }, 'URL抓取');
+          profiles = await callApify(APIFY_DETAILS_ACTOR, { directUrls: [keyword], resultsType: 'details', addProfileStatistics: true }, 'URL抓取');
         } else {
-          // 话题标签：第 1 步抓该标签下的帖子，第 2 步反推创作者详情
+          // 话题标签：第 1 步用官方 Hashtag Scraper 抓最近发布的帖子，第 2 步反推创作者详情
           const step1Body = {
-            directUrls: ['https://www.instagram.com/explore/tags/' + keyword + '/'],
+            hashtags: [keyword.replace(/^#/, '')],
             resultsType: 'posts',
-            resultsLimit: limit,
-            onlyPostsNewerThan: '1 month'
+            resultsLimit: limit
           };
-          const posts = await callApify(step1Body, '第1步-抓帖子');
+          const posts = await callApify(APIFY_HASHTAG_ACTOR, step1Body, '第1步-抓帖子');
           const usernames = [...new Set(posts.map(p => p && p.ownerUsername).filter(Boolean))];
           console.log('[discovery-search] 第1步提取到 %d 个去重用户名', usernames.length);
 
@@ -453,7 +456,7 @@ function createServer() {
               addProfileStatistics: true
             };
             try {
-              profiles = await callApify(step2Body, '第2步-抓详情');
+              profiles = await callApify(APIFY_DETAILS_ACTOR, step2Body, '第2步-抓详情');
             } catch (err) {
               // 第 2 步失败：降级为只返回用户名（无粉丝数等详情）
               console.warn('[discovery-search] 第2步失败，降级为仅用户名:', err.message);
