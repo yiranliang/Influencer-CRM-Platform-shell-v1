@@ -8835,19 +8835,17 @@ function discoveryUpdateStatus() {
         return;
     }
     var minRaw = (document.getElementById('discoveryMinFollowers').value || '').trim();
-    var stats;
-    if (!minRaw) {
-        stats = '共 ' + total + ' 个';
-    } else {
+    var stats = '';
+    if (minRaw) {
         var min = parseInt(minRaw, 10);
         if (isNaN(min)) min = 0;
         var count = discoveryResults.filter(function(r) { return (r.followersCount || 0) >= min; }).length;
-        stats = '其中 ≥' + min.toLocaleString() + ' 粉的 ' + count + ' 个';
+        stats = '，其中 ≥' + min.toLocaleString() + ' 粉的 ' + count + ' 个';
     }
     if (discoveryDropped === 0) {
-        statusEl.innerText = '本次找到 ' + total + ' 个新账号，' + stats;
+        statusEl.innerText = '本次找到 ' + total + ' 个新账号' + stats;
     } else {
-        statusEl.innerText = '本次找到 ' + total + ' 个新账号（已过滤 ' + discoveryDropped + ' 个重复，其中 ' + discoveryDroppedInHistory + ' 个在搜索历史、' + discoveryDroppedInLibrary + ' 个已在红人库），' + stats;
+        statusEl.innerText = '本次找到 ' + total + ' 个新账号（已过滤 ' + discoveryDropped + ' 个重复，其中 ' + discoveryDroppedInHistory + ' 个在搜索历史、' + discoveryDroppedInLibrary + ' 个已在红人库）' + stats;
     }
 }
 
