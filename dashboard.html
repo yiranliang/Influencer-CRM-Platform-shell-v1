@@ -1935,6 +1935,8 @@
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
                 </div>
 
+                <div id="apifyUsage" style="font-size:12px;color:#64748b;margin-bottom:8px;">Apify 额度：加载中…</div>
+
                 <div style="font-size:13px;color:#64748b;margin-bottom:12px;">
                     搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>
                     话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。
@@ -8734,6 +8736,7 @@
     }
 
     loadPaymentData();
+    loadApifyUsage();
 
 // ========== Discovery 红人搜索（UI 骨架，暂用 mock 数据）==========
 var discoveryResults = [];
@@ -8741,6 +8744,23 @@ var discoverySelected = new Set();
 var discoveryDropped = 0;
 var discoveryDroppedInHistory = 0;
 var discoveryDroppedInLibrary = 0;
+
+function loadApifyUsage() {
+    var el = document.getElementById('apifyUsage');
+    if (!el) return;
+    fetch('/api/apify-usage')
+        .then(function(resp) { return resp.json(); })
+        .then(function(d) {
+            if (!d || !d.success) { el.innerText = 'Apify 额度：—'; el.style.color = '#94a3b8'; return; }
+            var used = (d.used || 0).toFixed(2);
+            var limit = (d.limit || 0).toFixed(2);
+            var remaining = (d.remaining || 0).toFixed(2);
+            el.innerText = 'Apify 额度：已用 $' + used + ' / $' + limit + '（剩余 $' + remaining + '）';
+            if (d.cycleEnd) el.title = '周期结束：' + String(d.cycleEnd).slice(0, 10);
+            el.style.color = (d.remaining < 1) ? '#f97316' : '#64748b';
+        })
+        .catch(function() { el.innerText = 'Apify 额度：查询失败'; el.style.color = '#94a3b8'; });
+}
 
 function discoverySearch() {
     var keyword = document.getElementById('discoveryKeyword').value.trim();
@@ -8768,6 +8788,7 @@ function discoverySearch() {
             discoveryDroppedInHistory = data.droppedInHistory || 0;
             discoveryDroppedInLibrary = data.droppedInLibrary || 0;
             discoveryApplyFilter();
+            loadApifyUsage();
         } else {
             statusEl.innerText = '搜索失败';
             showToast((data && data.error) || '搜索失败', 'error');

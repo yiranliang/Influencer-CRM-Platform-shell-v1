@@ -509,6 +509,35 @@ function createServer() {
     return;
   }
 
+  // GET /api/apify-usage — 查 Apify 账户剩余额度（当月已用 / 月度限额）
+  if (pathname === '/api/apify-usage' && req.method === 'GET') {
+    if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
+    const url = 'https://api.apify.com/v2/users/me/limits?token=' + encodeURIComponent(APIFY_TOKEN);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    fetch(url, { signal: controller.signal })
+      .then(function(resp) {
+        clearTimeout(timer);
+        if (!resp.ok) throw new Error('Apify HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(function(json) {
+        const d = (json && json.data) || {};
+        const used = Math.round((Number(d.currentUsageCycleUsageUsdSum) || 0) * 100) / 100;
+        const limit = Math.round((Number(d.currentUsageCycleLimitUsd) || 0) * 100) / 100;
+        const remaining = Math.round((limit - used) * 100) / 100;
+        const cycleEnd = (d.currentUsageCycle && d.currentUsageCycle.ENDS_AT) || '';
+        sendJSON(res, 200, { success: true, used: used, limit: limit, remaining: remaining, cycleEnd: cycleEnd });
+      })
+      .catch(function(err) {
+        clearTimeout(timer);
+        const msg = (err && err.name === 'AbortError') ? '查询超时' : (err.message || '查询失败');
+        console.error('[apify-usage] 查询失败:', msg);
+        sendJSON(res, 500, { success: false, error: msg });
+      });
+    return;
+  }
+
   // POST /api/discovery-add-to-outreach — 把 Discovery 勾选的账号写入红人库（influencer_data.json）
   if (pathname === '/api/discovery-add-to-outreach' && req.method === 'POST') {
     parseBody(req).then((body) => {
