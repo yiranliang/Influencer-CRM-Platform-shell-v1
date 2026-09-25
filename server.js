@@ -380,24 +380,37 @@ function createServer() {
         if (extraHashtags.some(function (x) { return x.toLowerCase() === tag.toLowerCase(); })) return; // 去重自身重复
         extraHashtags.push(tag);
       });
+      // 相似红人发现的种子账号（去 @、去空格、去 URL 前缀，最多 5 个）
+      const seeds = [];
+      (Array.isArray(body.seeds) ? body.seeds : []).forEach(function (s) {
+        const raw = String(s || '').trim();
+        if (!raw) return;
+        const clean = raw.replace(/^https?:\/\//i, '').replace(/^(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/+$/, '');
+        if (!clean) return;
+        if (seeds.length >= 5) return;
+        if (seeds.some(function (x) { return x.toLowerCase() === clean.toLowerCase(); })) return;
+        seeds.push(clean);
+      });
       let limit = parseInt(body.resultsLimit, 10);
       if (isNaN(limit) || limit < 10) limit = APIFY_RESULTS_LIMIT; // 默认 30
       if (limit > 100) limit = 100;
-      if (!keyword) { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
+      if (!keyword && searchType !== 'similar') { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
+      if (searchType === 'similar' && seeds.length === 0) { sendJSON(res, 400, { success: false, error: '请至少输入 1 个种子账号' }); return; }
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
 
       const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
       const APIFY_DETAILS_ACTOR = 'apify~instagram-scraper';
       const APIFY_HASHTAG_ACTOR = 'apify~instagram-hashtag-scraper';
+      const APIFY_SIMILAR_ACTOR = 'zaver.api~instagram-similar-profiles-finder';
       function apifyUrl(actorId) {
         return 'https://api.apify.com/v2/acts/' + actorId + '/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN);
       }
 
       // 调一次 Apify（每步独立超时，token 打码打印请求体）
-      async function callApify(actorId, apifyBody, label) {
+      async function callApify(actorId, apifyBody, label, timeoutMs) {
         console.log('[discovery-search] %s 请求体: %s (token=%s)', label, JSON.stringify(apifyBody), maskedToken);
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 290000);
+        const timer = setTimeout(() => controller.abort(), timeoutMs || 290000);
         try {
           const resp = await fetch(apifyUrl(actorId), {
             method: 'POST',
@@ -434,6 +447,23 @@ function createServer() {
         if (searchType === 'url') {
           // URL 精确抓取：直接抓账号详情
           profiles = await callApify(APIFY_DETAILS_ACTOR, { directUrls: [keyword], resultsType: 'details', addProfileStatistics: true }, 'URL抓取');
+        } else if (searchType === 'similar') {
+          // 相似红人发现：用种子账号抓 Instagram 相关推荐账号（90 秒超时）
+          const bioKeywords = (Array.isArray(body.bioKeywords) ? body.bioKeywords : []).map(function (k) { return String(k || '').trim(); }).filter(function (k) { return k.length > 0; });
+          if (bioKeywords.length === 0) bioKeywords.push('amazon'); // 默认简介关键词
+          let minFollowers = parseInt(body.minFollowers, 10);
+          if (isNaN(minFollowers) || minFollowers < 0) minFollowers = 5000;
+          let maxProfiles = parseInt(body.maxProfiles, 10);
+          if (isNaN(maxProfiles) || maxProfiles < 1) maxProfiles = 200;
+          const similarBody = {
+            seeds: seeds,
+            maxDepth: 1,
+            maxProfiles: maxProfiles,
+            minFollowers: minFollowers,
+            bioKeywords: bioKeywords,
+            enrichProfiles: true
+          };
+          profiles = await callApify(APIFY_SIMILAR_ACTOR, similarBody, '相似发现', 90000);
         } else {
           // 话题标签：第 1 步用官方 Hashtag Scraper 抓最近发布的帖子，第 2 步反推创作者详情
           const hashtags = [keyword.replace(/^#/, ''), ...extraHashtags];
@@ -475,10 +505,10 @@ function createServer() {
           }
         }
 
-        // 去掉无用户名的脏数据（第 2 步偶尔返回空项）；URL 模式仍需在这里做红人库去重
+        // 去掉无用户名的脏数据（第 2 步偶尔返回空项）；URL/相似模式仍需在这里做红人库去重
         const rawCount = profiles.length;
         const fresh = [];
-        if (searchType === 'url') {
+        if (searchType === 'url' || searchType === 'similar') {
           profiles.forEach(function (it) {
             if (!it || !it.username) return;
             const uname = String(it.username).toLowerCase();
