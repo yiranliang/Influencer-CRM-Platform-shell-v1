@@ -1930,8 +1930,13 @@
                         <span class="search-icon">🔍</span>
                         <span class="search-clear" onclick="clearSearch('discoveryKeyword')">×</span>
                     </div>
-                    <label style="font-size:13px;color:#475569;white-space:nowrap;">抓取帖子数</label>
-                    <input type="number" id="discoveryResultsLimit" value="30" min="10" max="100" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <label style="font-size:13px;color:#475569;white-space:nowrap;">抓取帖子数</label>
+                            <input type="number" id="discoveryResultsLimit" value="30" min="10" max="100" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                        </div>
+                        <span style="font-size:11px;color:#94a3b8;">抓 N 条帖子 → 反推约 N×30% 个不同创作者</span>
+                    </div>
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
                 </div>
 
@@ -1944,7 +1949,7 @@
 
                 <div class="filter-bar" style="gap:12px;flex-wrap:wrap;">
                     <label style="font-size:13px;color:#475569;">粉丝数：</label>
-                    <input type="number" id="discoveryMinFollowers" placeholder="最小" oninput="discoveryApplyFilter()" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                    <input type="number" id="discoveryMinFollowers" value="5000" placeholder="最小" oninput="discoveryApplyFilter()" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                     <span style="color:#94a3b8;">~</span>
                     <input type="number" id="discoveryMaxFollowers" placeholder="最大" oninput="discoveryApplyFilter()" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                     <label style="font-size:13px;color:#475569;margin-left:8px;">仅认证：</label>
@@ -8744,6 +8749,8 @@ var discoverySelected = new Set();
 var discoveryDropped = 0;
 var discoveryDroppedInHistory = 0;
 var discoveryDroppedInLibrary = 0;
+var discoveryPostsCount = 0;
+var discoveryDerivedCount = 0;
 
 function loadApifyUsage() {
     var el = document.getElementById('apifyUsage');
@@ -8787,6 +8794,8 @@ function discoverySearch() {
             discoveryDropped = data.dropped || 0;
             discoveryDroppedInHistory = data.droppedInHistory || 0;
             discoveryDroppedInLibrary = data.droppedInLibrary || 0;
+            discoveryPostsCount = data.postsCount || 0;
+            discoveryDerivedCount = data.derivedCount || 0;
             discoveryApplyFilter();
             loadApifyUsage();
         } else {
@@ -8854,8 +8863,11 @@ function discoveryUpdateStatus() {
     var statusEl = document.getElementById('discoveryStatus');
     if (!statusEl) return;
     var total = discoveryResults.length;
+    var prefix = (discoveryPostsCount > 0)
+        ? '抓了 ' + discoveryPostsCount + ' 条帖子，反推出 ' + discoveryDerivedCount + ' 个不同账号；'
+        : '';
     if (total === 0 && discoveryDropped === 0) {
-        statusEl.innerText = '未找到结果，试试别的关键词或类型';
+        statusEl.innerText = prefix + '未找到结果，试试别的关键词或类型';
         return;
     }
     var minRaw = (document.getElementById('discoveryMinFollowers').value || '').trim();
@@ -8867,9 +8879,9 @@ function discoveryUpdateStatus() {
         stats = '，其中 ≥' + min.toLocaleString() + ' 粉的 ' + count + ' 个';
     }
     if (discoveryDropped === 0) {
-        statusEl.innerText = '本次找到 ' + total + ' 个新账号' + stats;
+        statusEl.innerText = prefix + '本次找到 ' + total + ' 个新账号' + stats;
     } else {
-        statusEl.innerText = '本次找到 ' + total + ' 个新账号（已过滤 ' + discoveryDropped + ' 个重复，其中 ' + discoveryDroppedInHistory + ' 个在搜索历史、' + discoveryDroppedInLibrary + ' 个已在红人库）' + stats;
+        statusEl.innerText = prefix + '本次找到 ' + total + ' 个新账号（已过滤 ' + discoveryDropped + ' 个重复，其中 ' + discoveryDroppedInHistory + ' 个在搜索历史、' + discoveryDroppedInLibrary + ' 个已在红人库）' + stats;
     }
 }
 
@@ -8933,6 +8945,8 @@ function discoveryClearResults() {
     discoveryDropped = 0;
     discoveryDroppedInHistory = 0;
     discoveryDroppedInLibrary = 0;
+    discoveryPostsCount = 0;
+    discoveryDerivedCount = 0;
     discoveryRenderTable();
     document.getElementById('discoveryStatus').innerText = '';
 }

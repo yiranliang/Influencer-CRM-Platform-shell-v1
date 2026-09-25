@@ -433,6 +433,8 @@ function createServer() {
 
       try {
         let profiles = []; // 最终返回的账号详情数组
+        let postsCount = 0;   // 第 1 步抓到的帖子数（URL 模式为 0）
+        let derivedCount = 0; // 从帖子反推出的去重账号数
 
         if (searchType === 'url') {
           // URL 精确抓取：直接抓账号详情
@@ -445,8 +447,10 @@ function createServer() {
             resultsLimit: limit
           };
           const posts = await callApify(APIFY_HASHTAG_ACTOR, step1Body, '第1步-抓帖子');
+          postsCount = posts.length;
           const usernames = [...new Set(posts.map(p => p && p.ownerUsername).filter(Boolean))];
-          console.log('[discovery-search] 第1步提取到 %d 个去重用户名', usernames.length);
+          derivedCount = usernames.length;
+          console.log('[discovery-search] 第1步抓了 %d 条帖子，提取到 %d 个去重用户名', postsCount, derivedCount);
 
           const topUsernames = usernames.slice(0, 30);
           if (topUsernames.length > 0) {
@@ -490,7 +494,9 @@ function createServer() {
           newCount: fresh.length,
           dropped: dropped,
           droppedInHistory: droppedInHistory,
-          droppedInLibrary: droppedInLibrary
+          droppedInLibrary: droppedInLibrary,
+          postsCount: postsCount,
+          derivedCount: derivedCount
         });
       } catch (err) {
         console.error('[discovery-search] 错误:', err.message);
@@ -523,10 +529,10 @@ function createServer() {
       })
       .then(function(json) {
         const d = (json && json.data) || {};
-        const used = Math.round((Number(d.currentUsageCycleUsageUsdSum) || 0) * 100) / 100;
-        const limit = Math.round((Number(d.currentUsageCycleLimitUsd) || 0) * 100) / 100;
+        const used = Math.round((Number(d.current && d.current.monthlyUsageUsd) || 0) * 100) / 100;
+        const limit = Math.round((Number(d.limits && d.limits.maxMonthlyUsageUsd) || 0) * 100) / 100;
         const remaining = Math.round((limit - used) * 100) / 100;
-        const cycleEnd = (d.currentUsageCycle && d.currentUsageCycle.ENDS_AT) || '';
+        const cycleEnd = (d.monthlyUsageCycle && d.monthlyUsageCycle.endAt) || '';
         sendJSON(res, 200, { success: true, used: used, limit: limit, remaining: remaining, cycleEnd: cycleEnd });
       })
       .catch(function(err) {
