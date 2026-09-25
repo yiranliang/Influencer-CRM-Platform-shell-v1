@@ -8853,7 +8853,7 @@ function discoveryUpdateStatus() {
 }
 
 function discoveryTypeLabel(r) {
-    var t = r && r.statistics && r.statistics.accountType;
+    var t = r && r.statistics && r.statistics.account_type;
     if (t === undefined || t === null || t === '') return '-';
     var n = Number(t);
     if (n === 3) return 'Creator';
@@ -8870,7 +8870,7 @@ function discoveryApplyFilter() {
     var list = discoveryResults.filter(function(r) {
         if ((r.followersCount || 0) < min || (r.followersCount || 0) > max) return false;
         if (verifiedOnly && !r.verified) return false;
-        if (creatorOnly && r.statistics && Number(r.statistics.accountType) === 2) return false;
+        if (creatorOnly && r.statistics && Number(r.statistics.account_type) === 2) return false;
         return true;
     });
     list.sort(function(a, b) { return (b.followersCount || 0) - (a.followersCount || 0); });

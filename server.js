@@ -390,7 +390,7 @@ function createServer() {
       const keyword = (body.keyword || '').trim();
       const searchType = body.searchType || 'hashtag';
       let limit = parseInt(body.resultsLimit, 10);
-      if (isNaN(limit) || limit < 10) limit = APIFY_RESULTS_LIMIT; // 默认 50
+      if (isNaN(limit) || limit < 10) limit = APIFY_RESULTS_LIMIT; // 默认 30
       if (limit > 100) limit = 100;
       if (!keyword) { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
