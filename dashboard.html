@@ -1947,6 +1947,8 @@
                     <input type="number" id="discoveryMaxFollowers" placeholder="最大" oninput="discoveryApplyFilter()" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                     <label style="font-size:13px;color:#475569;margin-left:8px;">仅认证：</label>
                     <input type="checkbox" id="discoveryVerifiedOnly" onchange="discoveryApplyFilter()" style="cursor:pointer;">
+                    <label style="font-size:13px;color:#475569;margin-left:8px;">只看创作者：</label>
+                    <input type="checkbox" id="discoveryCreatorOnly" checked onchange="discoveryApplyFilter()" style="cursor:pointer;">
                     <button class="btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="discoveryApplyFilter()">应用筛选</button>
                     <button class="btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="discoveryClearFilter()">清空</button>
                     <span style="font-size:12px;color:#94a3b8;margin-left:4px;">筛选只影响本地显示，Apify 已按抓取帖子数收费</span>
@@ -1955,7 +1957,7 @@
                 <div id="discoveryStatus" style="font-size:13px;color:#94a3b8;margin:12px 0;"></div>
 
                 <div style="overflow-x:auto;">
-                    <table class="cd-table" style="min-width:900px;">
+                    <table class="cd-table" style="min-width:980px;">
                         <thead>
                             <tr>
                                 <th style="width:40px;"><input type="checkbox" id="discoverySelectAll" onclick="discoveryToggleSelectAll()"></th>
@@ -1964,11 +1966,12 @@
                                 <th>帖子数</th>
                                 <th>简介</th>
                                 <th>认证</th>
+                                <th>类型</th>
                                 <th style="width:90px;">操作</th>
                             </tr>
                         </thead>
                         <tbody id="discoveryTableBody">
-                            <tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">输入关键词开始搜索</td></tr>
+                            <tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">输入关键词开始搜索</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -8764,8 +8767,7 @@ function discoverySearch() {
             discoveryDropped = data.dropped || 0;
             discoveryDroppedInHistory = data.droppedInHistory || 0;
             discoveryDroppedInLibrary = data.droppedInLibrary || 0;
-            discoveryRenderTable();
-            discoveryUpdateStatus();
+            discoveryApplyFilter();
         } else {
             statusEl.innerText = '搜索失败';
             showToast((data && data.error) || '搜索失败', 'error');
@@ -8782,7 +8784,7 @@ function discoveryRenderTable() {
     var tbody = document.getElementById('discoveryTableBody');
     if (!tbody) return;
     if (discoveryResults.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">无结果</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">无结果</td></tr>';
         document.getElementById('discoveryCount').innerText = '已选 0 个';
         return;
     }
@@ -8796,6 +8798,7 @@ function discoveryRenderTable() {
             '<td>' + (r.postsCount || 0) + '</td>' +
             '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
             '<td>' + (r.verified ? '✅' : '-') + '</td>' +
+            '<td>' + discoveryTypeLabel(r) + '</td>' +
             '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
             '</tr>';
     });
@@ -8849,20 +8852,33 @@ function discoveryUpdateStatus() {
     }
 }
 
+function discoveryTypeLabel(r) {
+    var t = r && r.statistics && r.statistics.accountType;
+    if (t === undefined || t === null || t === '') return '-';
+    var n = Number(t);
+    if (n === 3) return 'Creator';
+    if (n === 2) return 'Business';
+    if (n === 1) return 'Personal';
+    return '-';
+}
+
 function discoveryApplyFilter() {
     var min = parseInt(document.getElementById('discoveryMinFollowers').value) || 0;
     var max = parseInt(document.getElementById('discoveryMaxFollowers').value) || Infinity;
     var verifiedOnly = document.getElementById('discoveryVerifiedOnly').checked;
+    var creatorOnly = document.getElementById('discoveryCreatorOnly').checked;
     var list = discoveryResults.filter(function(r) {
         if ((r.followersCount || 0) < min || (r.followersCount || 0) > max) return false;
         if (verifiedOnly && !r.verified) return false;
+        if (creatorOnly && r.statistics && Number(r.statistics.accountType) === 2) return false;
         return true;
     });
     list.sort(function(a, b) { return (b.followersCount || 0) - (a.followersCount || 0); });
     discoveryUpdateStatus();
+    document.getElementById('discoveryCount').innerText = '已选 ' + discoverySelected.size + ' 个';
     var tbody = document.getElementById('discoveryTableBody');
     if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">无匹配结果</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">无匹配结果</td></tr>';
         return;
     }
     var html = '';
@@ -8875,6 +8891,7 @@ function discoveryApplyFilter() {
             '<td>' + (r.postsCount || 0) + '</td>' +
             '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
             '<td>' + (r.verified ? '✅' : '-') + '</td>' +
+            '<td>' + discoveryTypeLabel(r) + '</td>' +
             '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
             '</tr>';
     });
@@ -8885,8 +8902,8 @@ function discoveryClearFilter() {
     document.getElementById('discoveryMinFollowers').value = '';
     document.getElementById('discoveryMaxFollowers').value = '';
     document.getElementById('discoveryVerifiedOnly').checked = false;
-    discoveryRenderTable();
-    discoveryUpdateStatus();
+    document.getElementById('discoveryCreatorOnly').checked = true;
+    discoveryApplyFilter();
 }
 
 function discoveryClearResults() {

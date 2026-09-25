@@ -432,13 +432,14 @@ function createServer() {
 
         if (searchType === 'url') {
           // URL 精确抓取：直接抓账号详情
-          profiles = await callApify({ directUrls: [keyword], resultsType: 'details' }, 'URL抓取');
+          profiles = await callApify({ directUrls: [keyword], resultsType: 'details', addProfileStatistics: true }, 'URL抓取');
         } else {
           // 话题标签：第 1 步抓该标签下的帖子，第 2 步反推创作者详情
           const step1Body = {
             directUrls: ['https://www.instagram.com/explore/tags/' + keyword + '/'],
             resultsType: 'posts',
-            resultsLimit: limit
+            resultsLimit: limit,
+            onlyPostsNewerThan: '1 month'
           };
           const posts = await callApify(step1Body, '第1步-抓帖子');
           const usernames = [...new Set(posts.map(p => p && p.ownerUsername).filter(Boolean))];
@@ -448,7 +449,8 @@ function createServer() {
           if (topUsernames.length > 0) {
             const step2Body = {
               directUrls: topUsernames.map(u => 'https://www.instagram.com/' + u + '/'),
-              resultsType: 'details'
+              resultsType: 'details',
+              addProfileStatistics: true
             };
             try {
               profiles = await callApify(step2Body, '第2步-抓详情');
