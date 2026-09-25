@@ -1942,7 +1942,7 @@
 
                 <div class="filter-bar" style="gap:12px;flex-wrap:wrap;">
                     <label style="font-size:13px;color:#475569;">粉丝数：</label>
-                    <input type="number" id="discoveryMinFollowers" placeholder="最小" value="5000" oninput="discoveryApplyFilter()" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                    <input type="number" id="discoveryMinFollowers" placeholder="最小" oninput="discoveryApplyFilter()" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                     <span style="color:#94a3b8;">~</span>
                     <input type="number" id="discoveryMaxFollowers" placeholder="最大" oninput="discoveryApplyFilter()" style="width:90px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                     <label style="font-size:13px;color:#475569;margin-left:8px;">仅认证：</label>
@@ -8735,6 +8735,9 @@
 // ========== Discovery 红人搜索（UI 骨架，暂用 mock 数据）==========
 var discoveryResults = [];
 var discoverySelected = new Set();
+var discoveryDropped = 0;
+var discoveryDroppedInHistory = 0;
+var discoveryDroppedInLibrary = 0;
 
 function discoverySearch() {
     var keyword = document.getElementById('discoveryKeyword').value.trim();
@@ -8756,18 +8759,13 @@ function discoverySearch() {
         if (btn) btn.disabled = false;
         if (data && data.success) {
             discoveryResults = Array.isArray(data.data) ? data.data : [];
+            discoveryResults.sort(function(a, b) { return (b.followersCount || 0) - (a.followersCount || 0); });
             discoverySelected.clear();
+            discoveryDropped = data.dropped || 0;
+            discoveryDroppedInHistory = data.droppedInHistory || 0;
+            discoveryDroppedInLibrary = data.droppedInLibrary || 0;
             discoveryRenderTable();
-            var dropped = data.dropped || 0;
-            var droppedInHistory = data.droppedInHistory || 0;
-            var droppedInLibrary = data.droppedInLibrary || 0;
-            if (discoveryResults.length === 0 && dropped === 0) {
-                statusEl.innerText = '未找到结果，试试别的关键词或类型';
-            } else if (dropped === 0) {
-                statusEl.innerText = '本次找到 ' + discoveryResults.length + ' 个新账号';
-            } else {
-                statusEl.innerText = '本次找到 ' + discoveryResults.length + ' 个新账号（已过滤 ' + dropped + ' 个重复，其中 ' + droppedInHistory + ' 个在搜索历史、' + droppedInLibrary + ' 个已在红人库）';
-            }
+            discoveryUpdateStatus();
         } else {
             statusEl.innerText = '搜索失败';
             showToast((data && data.error) || '搜索失败', 'error');
@@ -8828,6 +8826,31 @@ function discoveryUpdateSelectAll() {
     if (sa) sa.checked = all;
 }
 
+function discoveryUpdateStatus() {
+    var statusEl = document.getElementById('discoveryStatus');
+    if (!statusEl) return;
+    var total = discoveryResults.length;
+    if (total === 0 && discoveryDropped === 0) {
+        statusEl.innerText = '未找到结果，试试别的关键词或类型';
+        return;
+    }
+    var minRaw = (document.getElementById('discoveryMinFollowers').value || '').trim();
+    var stats;
+    if (!minRaw) {
+        stats = '共 ' + total + ' 个';
+    } else {
+        var min = parseInt(minRaw, 10);
+        if (isNaN(min)) min = 0;
+        var count = discoveryResults.filter(function(r) { return (r.followersCount || 0) >= min; }).length;
+        stats = '其中 ≥' + min.toLocaleString() + ' 粉的 ' + count + ' 个';
+    }
+    if (discoveryDropped === 0) {
+        statusEl.innerText = '本次找到 ' + total + ' 个新账号，' + stats;
+    } else {
+        statusEl.innerText = '本次找到 ' + total + ' 个新账号（已过滤 ' + discoveryDropped + ' 个重复，其中 ' + discoveryDroppedInHistory + ' 个在搜索历史、' + discoveryDroppedInLibrary + ' 个已在红人库），' + stats;
+    }
+}
+
 function discoveryApplyFilter() {
     var min = parseInt(document.getElementById('discoveryMinFollowers').value) || 0;
     var max = parseInt(document.getElementById('discoveryMaxFollowers').value) || Infinity;
@@ -8837,6 +8860,8 @@ function discoveryApplyFilter() {
         if (verifiedOnly && !r.verified) return false;
         return true;
     });
+    list.sort(function(a, b) { return (b.followersCount || 0) - (a.followersCount || 0); });
+    discoveryUpdateStatus();
     var tbody = document.getElementById('discoveryTableBody');
     if (list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#94a3b8;">无匹配结果</td></tr>';
@@ -8863,11 +8888,15 @@ function discoveryClearFilter() {
     document.getElementById('discoveryMaxFollowers').value = '';
     document.getElementById('discoveryVerifiedOnly').checked = false;
     discoveryRenderTable();
+    discoveryUpdateStatus();
 }
 
 function discoveryClearResults() {
     discoveryResults = [];
     discoverySelected.clear();
+    discoveryDropped = 0;
+    discoveryDroppedInHistory = 0;
+    discoveryDroppedInLibrary = 0;
     discoveryRenderTable();
     document.getElementById('discoveryStatus').innerText = '';
 }
