@@ -605,14 +605,16 @@ function createServer() {
             skippedNames.push(uname);
             return;
           }
-          const bio = String(acct.biography || '').slice(0, 50);
-          const verified = acct.verified ? '是' : '否';
-          const note = '粉丝: ' + (acct.followersCount || 0) + ' | 帖子: ' + (acct.postsCount || 0) + ' | 认证: ' + verified + ' | 简介: ' + bio;
+          // similar 模式前端已拼好 email/note；hashtag/url 模式这里拼 hashtag 风格 note
+          const email = String(acct.email || '');
+          const note = acct.note
+            ? String(acct.note)
+            : '粉丝: ' + (acct.followersCount || 0) + ' | 帖子: ' + (acct.postsCount || 0) + ' | 认证: ' + (acct.verified ? '是' : '否') + ' | 简介: ' + String(acct.biography || '').slice(0, 50);
           const id = Date.now() + '_' + Math.random().toString(36).substr(2, 8) + '_' + uname;
           influencers.push({
             date: dateStr,
             name: uname,
-            email: '',
+            email: email,
             brand: '',
             channel: 'Instagram',
             status: 'Connected',

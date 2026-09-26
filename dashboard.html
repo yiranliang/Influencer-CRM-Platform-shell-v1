@@ -1981,7 +1981,7 @@
 
                 <div style="overflow-x:auto;">
                     <table class="cd-table" style="min-width:980px;">
-                        <thead>
+                        <thead id="discoveryTableHead">
                             <tr>
                                 <th style="width:40px;"><input type="checkbox" id="discoverySelectAll" onclick="discoveryToggleSelectAll()"></th>
                                 <th>用户名</th>
@@ -8798,6 +8798,7 @@ function discoveryOnSearchTypeChange() {
         if (similarOpts) similarOpts.style.display = 'none';
         if (similarHint) similarHint.style.display = 'none';
     }
+    discoveryRenderHeader();
 }
 
 function discoverySearch() {
@@ -8860,7 +8861,7 @@ function discoverySearch() {
         if (btn) btn.disabled = false;
         if (data && data.success) {
             discoveryResults = Array.isArray(data.data) ? data.data : [];
-            discoveryResults.sort(function(a, b) { return (b.followersCount || 0) - (a.followersCount || 0); });
+            discoveryResults.sort(function(a, b) { return discoveryFollowers(b) - discoveryFollowers(a); });
             discoverySelected.clear();
             discoveryDropped = data.dropped || 0;
             discoveryDroppedInLibrary = data.droppedInLibrary || 0;
@@ -8882,28 +8883,94 @@ function discoverySearch() {
     });
 }
 
+function discoveryCurrentType() {
+    var sel = document.getElementById('discoverySearchType');
+    return sel ? sel.value : '';
+}
+
+function discoveryIsSimilar() {
+    return discoveryCurrentType() === 'similar';
+}
+
+// similar 模式用 followers 字段，hashtag/url 模式用 followersCount
+function discoveryFollowers(r) {
+    return (r && r.followers != null ? r.followers : r.followersCount) || 0;
+}
+
+function discoveryColCount() {
+    return discoveryIsSimilar() ? 9 : 8;
+}
+
+function discoveryRenderHeader() {
+    var thead = document.getElementById('discoveryTableHead');
+    if (!thead) return;
+    var html;
+    if (discoveryIsSimilar()) {
+        html = '<tr>' +
+            '<th style="width:40px;"><input type="checkbox" id="discoverySelectAll" onclick="discoveryToggleSelectAll()"></th>' +
+            '<th>用户名</th>' +
+            '<th>全名</th>' +
+            '<th>粉丝数</th>' +
+            '<th>分类</th>' +
+            '<th>邮箱</th>' +
+            '<th>认证</th>' +
+            '<th>来源种子</th>' +
+            '<th style="width:90px;">操作</th>' +
+            '</tr>';
+    } else {
+        html = '<tr>' +
+            '<th style="width:40px;"><input type="checkbox" id="discoverySelectAll" onclick="discoveryToggleSelectAll()"></th>' +
+            '<th>用户名</th>' +
+            '<th>粉丝数</th>' +
+            '<th>帖子数</th>' +
+            '<th>简介</th>' +
+            '<th>认证</th>' +
+            '<th>类型</th>' +
+            '<th style="width:90px;">操作</th>' +
+            '</tr>';
+    }
+    thead.innerHTML = html;
+}
+
+function discoveryRenderRow(r) {
+    var checked = discoverySelected.has(r.username) ? ' checked' : '';
+    if (discoveryIsSimilar()) {
+        var profileUrl = r.profile_url || ('https://instagram.com/' + (r.username || ''));
+        return '<tr>' +
+            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username || '') + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
+            '<td><span class="copy-cell">' + escHTML(r.username || '') + '</span></td>' +
+            '<td>' + escHTML(r.full_name || '-') + '</td>' +
+            '<td>' + discoveryFollowers(r).toLocaleString() + '</td>' +
+            '<td>' + escHTML(r.category || '-') + '</td>' +
+            '<td>' + (r.public_email ? escHTML(r.public_email) : '-') + '</td>' +
+            '<td>' + (r.verified ? '✅' : '-') + '</td>' +
+            '<td>' + escHTML(r.seed_username || '-') + '</td>' +
+            '<td><a href="' + escAttr(profileUrl) + '" target="_blank" class="payment-action-btn">查看</a></td>' +
+            '</tr>';
+    }
+    return '<tr>' +
+        '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username || '') + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
+        '<td><span class="copy-cell">' + escHTML(r.username || '') + '</span></td>' +
+        '<td>' + (r.followersCount || 0).toLocaleString() + '</td>' +
+        '<td>' + (r.postsCount || 0) + '</td>' +
+        '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
+        '<td>' + (r.verified ? '✅' : '-') + '</td>' +
+        '<td>' + discoveryTypeLabel(r) + '</td>' +
+        '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
+        '</tr>';
+}
+
 function discoveryRenderTable() {
     var tbody = document.getElementById('discoveryTableBody');
     if (!tbody) return;
+    discoveryRenderHeader();
     if (discoveryResults.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">无结果</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="' + discoveryColCount() + '" style="text-align:center;padding:40px;color:#94a3b8;">无结果</td></tr>';
         document.getElementById('discoveryCount').innerText = '已选 0 个';
         return;
     }
     var html = '';
-    discoveryResults.forEach(function(r) {
-        var checked = discoverySelected.has(r.username) ? ' checked' : '';
-        html += '<tr>' +
-            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username || '') + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
-            '<td><span class="copy-cell">' + escHTML(r.username || '') + '</span></td>' +
-            '<td>' + (r.followersCount || 0).toLocaleString() + '</td>' +
-            '<td>' + (r.postsCount || 0) + '</td>' +
-            '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
-            '<td>' + (r.verified ? '✅' : '-') + '</td>' +
-            '<td>' + discoveryTypeLabel(r) + '</td>' +
-            '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
-            '</tr>';
-    });
+    discoveryResults.forEach(function(r) { html += discoveryRenderRow(r); });
     tbody.innerHTML = html;
     document.getElementById('discoveryCount').innerText = '已选 ' + discoverySelected.size + ' 个';
 }
@@ -8950,7 +9017,7 @@ function discoveryUpdateStatus() {
     if (minRaw) {
         var min = parseInt(minRaw, 10);
         if (isNaN(min)) min = 0;
-        var count = discoveryResults.filter(function(r) { return (r.followersCount || 0) >= min; }).length;
+        var count = discoveryResults.filter(function(r) { return discoveryFollowers(r) >= min; }).length;
         stats = '，其中 ≥' + min.toLocaleString() + ' 粉的 ' + count + ' 个';
     }
     if (discoveryDropped === 0) {
@@ -8976,33 +9043,22 @@ function discoveryApplyFilter() {
     var verifiedOnly = document.getElementById('discoveryVerifiedOnly').checked;
     var creatorOnly = document.getElementById('discoveryCreatorOnly').checked;
     var list = discoveryResults.filter(function(r) {
-        if ((r.followersCount || 0) < min || (r.followersCount || 0) > max) return false;
+        if (discoveryFollowers(r) < min || discoveryFollowers(r) > max) return false;
         if (verifiedOnly && !r.verified) return false;
         if (creatorOnly && r.statistics && Number(r.statistics.account_type) === 2) return false;
         return true;
     });
-    list.sort(function(a, b) { return (b.followersCount || 0) - (a.followersCount || 0); });
+    list.sort(function(a, b) { return discoveryFollowers(b) - discoveryFollowers(a); });
     discoveryUpdateStatus();
     document.getElementById('discoveryCount').innerText = '已选 ' + discoverySelected.size + ' 个';
+    discoveryRenderHeader();
     var tbody = document.getElementById('discoveryTableBody');
     if (list.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:#94a3b8;">无匹配结果</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="' + discoveryColCount() + '" style="text-align:center;padding:40px;color:#94a3b8;">无匹配结果</td></tr>';
         return;
     }
     var html = '';
-    list.forEach(function(r) {
-        var checked = discoverySelected.has(r.username) ? ' checked' : '';
-        html += '<tr>' +
-            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username || '') + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
-            '<td><span class="copy-cell">' + escHTML(r.username || '') + '</span></td>' +
-            '<td>' + (r.followersCount || 0).toLocaleString() + '</td>' +
-            '<td>' + (r.postsCount || 0) + '</td>' +
-            '<td style="max-width:280px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
-            '<td>' + (r.verified ? '✅' : '-') + '</td>' +
-            '<td>' + discoveryTypeLabel(r) + '</td>' +
-            '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
-            '</tr>';
-    });
+    list.forEach(function(r) { html += discoveryRenderRow(r); });
     tbody.innerHTML = html;
 }
 
@@ -9028,8 +9084,20 @@ function discoveryClearResults() {
 
 function discoveryAddSelectedToOutreach() {
     if (discoverySelected.size === 0) { showToast('请先勾选要加入的红人', 'error'); return; }
-    // 从 discoveryResults 里收集勾选的账号
+    // 从 discoveryResults 里收集勾选的账号（similar 模式字段名不同，单独映射）
+    var isSimilar = discoveryIsSimilar();
     var accounts = discoveryResults.filter(function(r) { return discoverySelected.has(r.username); }).map(function(r) {
+        if (isSimilar) {
+            var email = r.public_email || '';
+            var followers = discoveryFollowers(r);
+            var category = r.category || '';
+            var seed = r.seed_username || '';
+            return {
+                username: r.username,
+                email: email,
+                note: '粉丝: ' + followers + ' | 分类: ' + category + ' | 来源: ' + seed
+            };
+        }
         return {
             username: r.username,
             followersCount: r.followersCount,
