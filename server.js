@@ -4,6 +4,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { getGmailStats, getInfluencerLabels } from './gmail_stats.js';
 import GmailAutomation from './gmailAutomation.js';
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
+
+// 代理配置：国内网络下 Apify 必须走代理才能访问（undici 全局 dispatcher，一次设置所有 fetch 生效）
+const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || 'http://127.0.0.1:7897';
+setGlobalDispatcher(new ProxyAgent(PROXY_URL));
+console.log('[proxy] 使用代理:', PROXY_URL);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
