@@ -436,7 +436,7 @@ function createServer() {
           return items;
         } catch (err) {
           clearTimeout(timer);
-          if (err && err.name === 'AbortError') throw new Error('Apify 请求超时（约 5 分钟）');
+          if (err && err.name === 'AbortError') throw new Error('Apify 请求超时（约 10 分钟）');
           throw err;
         }
       }
@@ -454,7 +454,7 @@ function createServer() {
           // URL 精确抓取：直接抓账号详情
           profiles = await callApify(APIFY_DETAILS_ACTOR, { directUrls: [keyword], resultsType: 'details', addProfileStatistics: true }, 'URL抓取');
         } else if (searchType === 'similar') {
-          // 相似红人发现：用种子账号抓 Instagram 相关推荐账号（90 秒超时）
+          // 相似红人发现：用种子账号抓 Instagram 相关推荐账号（10 分钟超时）
           const bioKeywords = (Array.isArray(body.bioKeywords) ? body.bioKeywords : []).map(function (k) { return String(k || '').trim(); }).filter(function (k) { return k.length > 0; });
           if (bioKeywords.length === 0) bioKeywords.push('amazon'); // 默认简介关键词
           let minFollowers = parseInt(body.minFollowers, 10);
@@ -469,7 +469,7 @@ function createServer() {
             bioKeywords: bioKeywords,
             enrichProfiles: true
           };
-          profiles = await callApify(APIFY_SIMILAR_ACTOR, similarBody, '相似发现', 90000);
+          profiles = await callApify(APIFY_SIMILAR_ACTOR, similarBody, '相似发现', 600000);
         } else {
           // 话题标签：第 1 步用官方 Hashtag Scraper 抓最近发布的帖子，第 2 步反推创作者详情
           const hashtags = [keyword.replace(/^#/, ''), ...extraHashtags];

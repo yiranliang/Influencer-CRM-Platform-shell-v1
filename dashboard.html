@@ -1939,6 +1939,7 @@
                         <span style="font-size:11px;color:#94a3b8;">抓 N 条帖子 → 反推约 N×30% 个不同创作者</span>
                     </div>
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
+                    <span id="discoverySimilarHint" style="display:none;font-size:12px;color:#f97316;white-space:nowrap;">预计 5-6 分钟，请勿关闭页面</span>
                 </div>
 
                 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
@@ -8787,12 +8788,15 @@ function discoveryOnSearchTypeChange() {
     var type = document.getElementById('discoverySearchType').value;
     var kw = document.getElementById('discoveryKeyword');
     var similarOpts = document.getElementById('discoverySimilarOptions');
+    var similarHint = document.getElementById('discoverySimilarHint');
     if (type === 'similar') {
         if (kw) kw.placeholder = '输入种子账号，逗号分隔，最多 5 个（如 user1, user2, user3）';
         if (similarOpts) similarOpts.style.display = 'flex';
+        if (similarHint) similarHint.style.display = 'inline';
     } else {
         if (kw) kw.placeholder = '输入话题标签，如 yoga、fitness（不用加 #）';
         if (similarOpts) similarOpts.style.display = 'none';
+        if (similarHint) similarHint.style.display = 'none';
     }
 }
 
@@ -8802,6 +8806,8 @@ function discoverySearch() {
     var btn = document.getElementById('discoverySearchBtn');
     var statusEl = document.getElementById('discoveryStatus');
     var body = { searchType: type };
+    var searchStartTime = Date.now();
+    var searchTimer = null;
 
     if (type === 'similar') {
         var seeds = [];
@@ -8822,7 +8828,11 @@ function discoverySearch() {
         body.bioKeywords = bioKeywords;
         body.minFollowers = minFollowers;
         body.maxProfiles = maxProfiles;
-        statusEl.innerText = '搜索相似红人中，请稍候（约 1-2 分钟）...';
+        statusEl.innerText = '搜索中... 已等待 0 秒（预计 5-6 分钟，请勿关闭页面）';
+        searchTimer = setInterval(function() {
+            var secs = Math.floor((Date.now() - searchStartTime) / 1000);
+            statusEl.innerText = '搜索中... 已等待 ' + secs + ' 秒（预计 5-6 分钟，请勿关闭页面）';
+        }, 1000);
     } else {
         if (!keyword) { showToast('请输入话题标签或 URL', 'error'); return; }
         var limit = parseInt(document.getElementById('discoveryResultsLimit').value, 10);
@@ -8846,6 +8856,7 @@ function discoverySearch() {
         body: JSON.stringify(body)
     }).then(function(resp) { return resp.json(); })
     .then(function(data) {
+        if (searchTimer) clearInterval(searchTimer);
         if (btn) btn.disabled = false;
         if (data && data.success) {
             discoveryResults = Array.isArray(data.data) ? data.data : [];
@@ -8863,6 +8874,7 @@ function discoverySearch() {
             showToast((data && data.error) || '搜索失败', 'error');
         }
     }).catch(function(err) {
+        if (searchTimer) clearInterval(searchTimer);
         if (btn) btn.disabled = false;
         statusEl.innerText = '搜索失败';
         console.error(err);
