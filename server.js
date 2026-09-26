@@ -447,6 +447,8 @@ function createServer() {
         let derivedCount = 0; // 从帖子反推出的去重账号数
         let droppedInLibrary = 0; // 过滤掉的红人库已有账号
         let hashtagCount = 0;     // 本次搜索合并的话题标签数（URL 模式为 0）
+        let afterInternalDedup = 0; // 相似发现：内部去重后的数量
+        let similarRawCount = 0;    // 相似发现：Apify 原始返回数
 
         const influencerNames = loadInfluencerNames();
 
@@ -470,6 +472,26 @@ function createServer() {
             enrichProfiles: true
           };
           profiles = await callApify(APIFY_SIMILAR_ACTOR, similarBody, '相似发现', 600000);
+          // 相似发现两层去重：1) 本次内部按 username 去重；2) 过滤掉已在红人库的账号
+          similarRawCount = profiles.length;
+          const seen = new Set();
+          const deduped = [];
+          profiles.forEach(function (it) {
+            if (!it || !it.username) return;
+            const uname = String(it.username).toLowerCase();
+            if (seen.has(uname)) return;
+            seen.add(uname);
+            deduped.push(it);
+          });
+          afterInternalDedup = deduped.length;
+          const freshSimilar = [];
+          let droppedLib = 0;
+          deduped.forEach(function (it) {
+            if (influencerNames.has(String(it.username).toLowerCase())) { droppedLib++; return; }
+            freshSimilar.push(it);
+          });
+          profiles = freshSimilar;
+          droppedInLibrary = droppedLib;
         } else {
           // 话题标签：第 1 步用官方 Hashtag Scraper 抓最近发布的帖子，第 2 步反推创作者详情
           const hashtags = [keyword.replace(/^#/, ''), ...extraHashtags];
@@ -511,10 +533,16 @@ function createServer() {
           }
         }
 
-        // 去掉无用户名的脏数据（第 2 步偶尔返回空项）；URL/相似模式仍需在这里做红人库去重
-        const rawCount = profiles.length;
+        // 去掉无用户名的脏数据（第 2 步偶尔返回空项）；URL 模式在这里做红人库去重；similar 已在分支内完成去重
+        let rawCount;
         const fresh = [];
-        if (searchType === 'url' || searchType === 'similar') {
+        if (searchType === 'similar') {
+          rawCount = similarRawCount; // Apify 原始返回数（去重前的总数）
+          profiles.forEach(function (it) {
+            if (it && it.username) fresh.push(it);
+          });
+        } else if (searchType === 'url') {
+          rawCount = profiles.length;
           profiles.forEach(function (it) {
             if (!it || !it.username) return;
             const uname = String(it.username).toLowerCase();
@@ -522,6 +550,7 @@ function createServer() {
             fresh.push(it);
           });
         } else {
+          rawCount = profiles.length;
           profiles.forEach(function (it) {
             if (it && it.username) fresh.push(it);
           });
@@ -533,6 +562,7 @@ function createServer() {
           success: true,
           data: fresh,
           total: rawCount,
+          afterInternalDedup: afterInternalDedup,
           newCount: fresh.length,
           dropped: dropped,
           droppedInLibrary: droppedInLibrary,

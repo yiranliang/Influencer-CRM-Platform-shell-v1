@@ -8766,6 +8766,8 @@ var discoveryDroppedInLibrary = 0;
 var discoveryPostsCount = 0;
 var discoveryDerivedCount = 0;
 var discoveryHashtagCount = 0;
+var discoveryTotal = 0;
+var discoveryAfterInternalDedup = 0;
 
 function loadApifyUsage() {
     var el = document.getElementById('apifyUsage');
@@ -8868,6 +8870,8 @@ function discoverySearch() {
             discoveryPostsCount = data.postsCount || 0;
             discoveryDerivedCount = data.derivedCount || 0;
             discoveryHashtagCount = data.hashtagCount || 0;
+            discoveryTotal = data.total || 0;
+            discoveryAfterInternalDedup = data.afterInternalDedup || 0;
             discoveryApplyFilter();
             loadApifyUsage();
         } else {
@@ -9002,6 +9006,10 @@ function discoveryUpdateStatus() {
     var statusEl = document.getElementById('discoveryStatus');
     if (!statusEl) return;
     var total = discoveryResults.length;
+    if (discoveryIsSimilar()) {
+        statusEl.innerText = 'Apify 返回 ' + (discoveryTotal || 0) + ' 个 → 内部去重后 ' + (discoveryAfterInternalDedup || 0) + ' 个 → 过滤红人库 ' + (discoveryDroppedInLibrary || 0) + ' 个 → 显示 ' + total + ' 个';
+        return;
+    }
     var prefix = '';
     if (discoveryPostsCount > 0) {
         prefix = '抓了 ' + discoveryPostsCount + ' 条帖子';
