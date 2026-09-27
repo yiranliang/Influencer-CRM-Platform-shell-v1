@@ -2093,7 +2093,7 @@
                     <button class="btn-secondary" onclick="window.open('https://console.apify.com/actors/runs','_blank')">📊 查看 Apify 历史</button>
                 </div>
 
-                <div style="font-size:13px;color:#64748b;margin-bottom:12px;">
+                <div id="discoveryHint" style="font-size:13px;color:#64748b;margin-bottom:12px;">
                     搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>
                     话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。
                 </div>
@@ -9218,8 +9218,22 @@ function loadApifyUsage() {
         .catch(function() { el.innerText = 'Apify 额度：查询失败'; el.style.color = '#94a3b8'; });
 }
 
+var discoveryHints = {
+    hashtag: '搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。',
+    url: '输入 Instagram 主页 URL，直接抓取该账号的资料（粉丝数、简介、认证）。<br>每次约 $0.003/账号，速度快。',
+    similar: '输入种子账号，Apify 帮你找 Instagram 推荐的相关账号。<br>每次约 $0.2-0.4，耗时 5-6 分钟，请耐心等待。<br>结果精准度高，适合找同领域、同风格的人。',
+    batch: '上传/粘贴用户名列表（每批最多 50 个），批量拉取资料。<br>自动按关键词匹配简介，筛选符合条件的红人。<br>每个账号约 $0.003，一次 50 个约 $0.13。'
+};
+
+function discoveryUpdateHint() {
+    var type = document.getElementById('discoverySearchType').value;
+    var el = document.getElementById('discoveryHint');
+    if (el) el.innerHTML = discoveryHints[type] || discoveryHints.hashtag;
+}
+
 function discoveryOnSearchTypeChange() {
     var type = document.getElementById('discoverySearchType').value;
+    discoveryUpdateHint();
     var kw = document.getElementById('discoveryKeyword');
     var similarOpts = document.getElementById('discoverySimilarOptions');
     var similarHint = document.getElementById('discoverySimilarHint');
