@@ -505,6 +505,32 @@
         }
         .color-opt:hover { transform: scale(1.1); }
         .color-opt.selected { border-color: #fff; box-shadow: 0 0 0 2px #4f46e5, 0 2px 6px rgba(0,0,0,0.2); }
+        .tool-card-left { display: flex; align-items: center; gap: 10px; }
+        .tool-drag-handle {
+            cursor: grab; color: #cbd5e1; font-size: 18px; line-height: 1;
+            user-select: none; flex-shrink: 0; padding: 2px;
+        }
+        .tool-drag-handle:active { cursor: grabbing; }
+        .tool-card:hover .tool-drag-handle { color: #94a3b8; }
+        .tool-edit {
+            display: none;
+            width: 22px; height: 22px; border-radius: 6px;
+            background: #e0e7ff; color: #4f46e5;
+            font-size: 12px; line-height: 22px; text-align: center;
+            cursor: pointer; border: none; padding: 0; flex-shrink: 0;
+        }
+        .tool-card:hover .tool-edit { display: block; }
+        .tool-card.dragging { opacity: 0.5; }
+        .tool-card.drop-before { position: relative; }
+        .tool-card.drop-before::before {
+            content: ''; position: absolute; top: -6px; left: 0; right: 0; height: 3px;
+            background: #4f46e5; border-radius: 2px;
+        }
+        .tool-card.drop-after { position: relative; }
+        .tool-card.drop-after::after {
+            content: ''; position: absolute; bottom: -6px; left: 0; right: 0; height: 3px;
+            background: #4f46e5; border-radius: 2px;
+        }
         @media (max-width: 1100px) { .tools-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 640px) { .tools-grid { grid-template-columns: 1fr; } }
         /* Outreach 操作按钮组 —— .outreach-toolbar 里的左侧一组
@@ -2242,7 +2268,7 @@
 <!-- 添加工具弹窗 -->
 <div id="addToolModal" class="modal" style="display:none;">
     <div class="modal-content" style="width:450px;">
-        <div class="modal-header"><h3>添加工具</h3><button onclick="closeModal('addToolModal')">×</button></div>
+        <div class="modal-header"><h3 id="toolModalTitle">添加工具</h3><button onclick="closeModal('addToolModal')">×</button></div>
         <div class="modal-body">
             <div class="form-group"><label>工具名称 <span style="color:red;">*</span></label><input type="text" id="toolName" placeholder="如 PayPal 手续费计算"></div>
             <div class="form-group"><label>网址 <span style="color:red;">*</span></label><input type="text" id="toolUrl" placeholder="https://..."></div>
@@ -5457,10 +5483,14 @@
             var desc = escHTML((t && t.desc) || '');
             var icon = escHTML((t && t.icon) || '🌐');
             var color = (t && t.color) ? String(t.color) : '#4f46e5';
-            html += '<div class="tool-card" data-url="' + escAttr(url) + '">' +
+            html += '<div class="tool-card" data-idx="' + idx + '" data-url="' + escAttr(url) + '">' +
                 '<div class="tool-card-top">' +
-                    '<div class="tool-card-icon" style="background:' + escAttr(color) + ';">' + icon + '</div>' +
+                    '<div class="tool-card-left">' +
+                        '<span class="tool-drag-handle" draggable="true" data-idx="' + idx + '" title="拖拽排序">≡</span>' +
+                        '<div class="tool-card-icon" style="background:' + escAttr(color) + ';">' + icon + '</div>' +
+                    '</div>' +
                     '<div class="tool-card-right">' +
+                        '<span class="tool-edit" data-idx="' + idx + '" title="编辑">✏️</span>' +
                         '<span class="tool-delete" data-idx="' + idx + '" title="删除">×</span>' +
                         '<span class="tool-card-arrow">›</span>' +
                     '</div>' +
@@ -5532,12 +5562,29 @@
         });
     }
 
+    var editingToolIdx = null;
+
     function showAddToolModal() {
+        editingToolIdx = null;
+        document.getElementById('toolModalTitle').textContent = '添加工具';
         document.getElementById('toolName').value = '';
         document.getElementById('toolUrl').value = '';
         document.getElementById('toolDesc').value = '';
         selectToolEmoji('🔗');
         selectToolColor('#4f46e5');
+        document.getElementById('addToolModal').style.display = 'flex';
+    }
+
+    function showEditToolModal(idx) {
+        if (!toolsList[idx]) return;
+        editingToolIdx = idx;
+        var t = toolsList[idx];
+        document.getElementById('toolModalTitle').textContent = '编辑工具';
+        document.getElementById('toolName').value = t.name || '';
+        document.getElementById('toolUrl').value = t.url || '';
+        document.getElementById('toolDesc').value = t.desc || '';
+        selectToolEmoji(t.icon || '🔗');
+        selectToolColor(t.color || '#4f46e5');
         document.getElementById('addToolModal').style.display = 'flex';
     }
 
@@ -5550,7 +5597,12 @@
         if (!name) { showToast('请输入工具名称', 'warning'); return; }
         if (!url) { showToast('请输入网址', 'warning'); return; }
         if (!/^https?:\/\//i.test(url)) { showToast('网址需以 http:// 或 https:// 开头', 'warning'); return; }
-        toolsList.push({ name: name, url: url, desc: desc, icon: icon, color: color });
+        var obj = { name: name, url: url, desc: desc, icon: icon, color: color };
+        if (editingToolIdx !== null && toolsList[editingToolIdx]) {
+            toolsList[editingToolIdx] = obj;
+        } else {
+            toolsList.push(obj);
+        }
         closeModal('addToolModal');
         saveTools();
     }
@@ -5563,6 +5615,11 @@
     }
 
     document.getElementById('toolsGrid').addEventListener('click', function(e) {
+        var edit = e.target.closest('.tool-edit');
+        if (edit) {
+            showEditToolModal(parseInt(edit.getAttribute('data-idx'), 10));
+            return;
+        }
         var del = e.target.closest('.tool-delete');
         if (del) {
             deleteTool(parseInt(del.getAttribute('data-idx'), 10));
@@ -5577,6 +5634,64 @@
             var url = card.getAttribute('data-url');
             if (url && url !== '#') window.open(url, '_blank');
         }
+    });
+
+    var toolDragIdx = null;
+    function clearToolDropIndicators() {
+        document.querySelectorAll('#toolsGrid .tool-card.drop-before, #toolsGrid .tool-card.drop-after').forEach(function(c) {
+            c.classList.remove('drop-before', 'drop-after');
+        });
+    }
+    document.getElementById('toolsGrid').addEventListener('dragstart', function(e) {
+        var handle = e.target.closest('.tool-drag-handle');
+        if (!handle) return;
+        toolDragIdx = parseInt(handle.getAttribute('data-idx'), 10);
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setData('text/plain', String(toolDragIdx)); } catch (err) {}
+        var card = handle.closest('.tool-card');
+        if (card) card.classList.add('dragging');
+    });
+    document.getElementById('toolsGrid').addEventListener('dragend', function(e) {
+        toolDragIdx = null;
+        clearToolDropIndicators();
+        document.querySelectorAll('#toolsGrid .tool-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+    });
+    document.getElementById('toolsGrid').addEventListener('dragover', function(e) {
+        if (toolDragIdx === null) return;
+        var card = e.target.closest('.tool-card');
+        if (!card) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        clearToolDropIndicators();
+        var rect = card.getBoundingClientRect();
+        var before = (e.clientY - rect.top) < (rect.height / 2);
+        card.classList.add(before ? 'drop-before' : 'drop-after');
+    });
+    document.getElementById('toolsGrid').addEventListener('dragleave', function(e) {
+        var card = e.target.closest('.tool-card');
+        if (card) card.classList.remove('drop-before', 'drop-after');
+    });
+    document.getElementById('toolsGrid').addEventListener('drop', function(e) {
+        e.preventDefault();
+        var card = e.target.closest('.tool-card');
+        var from = toolDragIdx;
+        toolDragIdx = null;
+        clearToolDropIndicators();
+        document.querySelectorAll('#toolsGrid .tool-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+        if (!card || from === null) return;
+        var targetIdx = parseInt(card.getAttribute('data-idx'), 10);
+        if (isNaN(targetIdx) || from === targetIdx) return;
+        var rect = card.getBoundingClientRect();
+        var before = (e.clientY - rect.top) < (rect.height / 2);
+        var item = toolsList.splice(from, 1)[0];
+        var insertIdx;
+        if (before) {
+            insertIdx = (from < targetIdx) ? targetIdx - 1 : targetIdx;
+        } else {
+            insertIdx = (from < targetIdx) ? targetIdx : targetIdx + 1;
+        }
+        toolsList.splice(insertIdx, 0, item);
+        saveTools();
     });
 
     renderToolEmojiPicker();
