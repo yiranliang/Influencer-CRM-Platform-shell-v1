@@ -1932,7 +1932,7 @@
                         <span class="search-icon">🔍</span>
                         <span class="search-clear" onclick="clearSearch('discoveryKeyword')">×</span>
                     </div>
-                    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;">
+                    <div id="discoveryHashtagLimitWrap" style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;">
                         <div style="display:flex;align-items:center;gap:6px;">
                             <label style="font-size:13px;color:#475569;white-space:nowrap;">抓取帖子数</label>
                             <input type="number" id="discoveryResultsLimit" value="30" min="10" max="100" style="width:70px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
@@ -1940,10 +1940,12 @@
                         <span style="font-size:11px;color:#94a3b8;">抓 N 条帖子 → 反推约 N×30% 个不同创作者</span>
                     </div>
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
+                    <button class="btn-secondary" id="discoveryImportCsvBtn" onclick="discoveryImportCsv()" style="display:none;">📁 导入 CSV</button>
+                    <button class="btn-secondary" id="discoveryStopBtn" onclick="discoveryBatchStop = true" style="display:none;">停止</button>
                     <span id="discoverySimilarHint" style="display:none;font-size:12px;color:#f97316;white-space:nowrap;">预计 5-6 分钟，请勿关闭页面</span>
                 </div>
 
-                <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+                <div id="discoveryExtraHashtagsWrap" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
                     <label style="font-size:13px;color:#475569;white-space:nowrap;">额外标签（可选，逗号分隔）</label>
                     <input type="text" id="discoveryExtraHashtags" style="flex:1;min-width:260px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;" placeholder="如 amazonfashionfinds, amazonmusthaves（最多 5 个）">
                 </div>
@@ -8783,6 +8785,7 @@ var discoveryDerivedCount = 0;
 var discoveryHashtagCount = 0;
 var discoveryTotal = 0;
 var discoveryAfterInternalDedup = 0;
+var discoveryBatchStop = false;
 
 function loadApifyUsage() {
     var el = document.getElementById('apifyUsage');
@@ -8809,6 +8812,11 @@ function discoveryOnSearchTypeChange() {
     var batchOpts = document.getElementById('discoveryBatchOptions');
     var batchMatchedFilter = document.getElementById('discoveryBatchMatchedFilter');
     var exportBtn = document.getElementById('discoveryExportCsvBtn');
+    var importBtn = document.getElementById('discoveryImportCsvBtn');
+    var stopBtn = document.getElementById('discoveryStopBtn');
+    var limitWrap = document.getElementById('discoveryHashtagLimitWrap');
+    var extraWrap = document.getElementById('discoveryExtraHashtagsWrap');
+    discoveryBatchStop = true; // 切换类型时取消正在跑的批量任务
     if (type === 'similar') {
         if (kw) kw.placeholder = '输入种子账号，逗号分隔，最多 5 个（如 user1, user2, user3）';
         if (similarOpts) similarOpts.style.display = 'flex';
@@ -8816,6 +8824,10 @@ function discoveryOnSearchTypeChange() {
         if (batchOpts) batchOpts.style.display = 'none';
         if (batchMatchedFilter) batchMatchedFilter.style.display = 'none';
         if (exportBtn) exportBtn.style.display = 'none';
+        if (importBtn) importBtn.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (limitWrap) limitWrap.style.display = 'flex';
+        if (extraWrap) extraWrap.style.display = 'flex';
     } else if (type === 'batch') {
         if (kw) kw.placeholder = '粘贴用户名列表（换行或逗号分隔，每批最多 50 个）';
         if (similarOpts) similarOpts.style.display = 'none';
@@ -8823,6 +8835,10 @@ function discoveryOnSearchTypeChange() {
         if (batchOpts) batchOpts.style.display = 'flex';
         if (batchMatchedFilter) batchMatchedFilter.style.display = 'inline-flex';
         if (exportBtn) exportBtn.style.display = 'inline-block';
+        if (importBtn) importBtn.style.display = 'inline-block';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (limitWrap) limitWrap.style.display = 'none';
+        if (extraWrap) extraWrap.style.display = 'none';
     } else {
         if (kw) kw.placeholder = '输入话题标签，如 yoga、fitness（不用加 #）';
         if (similarOpts) similarOpts.style.display = 'none';
@@ -8830,6 +8846,10 @@ function discoveryOnSearchTypeChange() {
         if (batchOpts) batchOpts.style.display = 'none';
         if (batchMatchedFilter) batchMatchedFilter.style.display = 'none';
         if (exportBtn) exportBtn.style.display = 'none';
+        if (importBtn) importBtn.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (limitWrap) limitWrap.style.display = 'flex';
+        if (extraWrap) extraWrap.style.display = 'flex';
     }
     discoveryRenderHeader();
 }
@@ -8876,7 +8896,6 @@ function discoverySearch() {
         var seenU = {};
         usernames = usernames.filter(function(s) { var k = s.toLowerCase(); if (seenU[k]) return false; seenU[k] = true; return true; });
         if (usernames.length === 0) { showToast('请粘贴至少 1 个用户名', 'error'); return; }
-        if (usernames.length > 50) { showToast('一次最多 50 个，请分批', 'error'); return; }
         var batchBioKeywords = [];
         var batchBioRaw = (document.getElementById('discoveryBatchBioKeywords').value || '').trim();
         if (batchBioRaw) {
@@ -8885,15 +8904,8 @@ function discoverySearch() {
         var batchMinFollowers = parseInt(document.getElementById('discoveryBatchMinFollowers').value, 10);
         if (isNaN(batchMinFollowers) || batchMinFollowers < 0) batchMinFollowers = 5000;
         var batchOnlyVerified = document.getElementById('discoveryBatchOnlyVerified').checked;
-        body.usernames = usernames;
-        body.bioKeywords = batchBioKeywords;
-        body.minFollowers = batchMinFollowers;
-        body.onlyVerified = batchOnlyVerified;
-        statusEl.innerText = '批量检查中... 已等待 0 秒（最多 50 个，约 1-5 分钟）';
-        searchTimer = setInterval(function() {
-            var secs = Math.floor((Date.now() - searchStartTime) / 1000);
-            statusEl.innerText = '批量检查中... 已等待 ' + secs + ' 秒（最多 50 个，约 1-5 分钟）';
-        }, 1000);
+        discoveryBatchRun(usernames, batchBioKeywords, batchMinFollowers, batchOnlyVerified);
+        return;
     } else {
         if (!keyword) { showToast('请输入话题标签或 URL', 'error'); return; }
         var limit = parseInt(document.getElementById('discoveryResultsLimit').value, 10);
@@ -8943,6 +8955,195 @@ function discoverySearch() {
         console.error(err);
         showToast('请求失败：' + err.message, 'error');
     });
+}
+
+// 批量检查：把用户名切成 50/批，顺序调用，合并结果；支持中途停止
+function discoveryBatchRun(usernames, bioKeywords, minFollowers, onlyVerified) {
+    var btn = document.getElementById('discoverySearchBtn');
+    var stopBtn = document.getElementById('discoveryStopBtn');
+    var statusEl = document.getElementById('discoveryStatus');
+    discoveryBatchStop = false;
+    if (btn) btn.disabled = true;
+    if (stopBtn) stopBtn.style.display = 'inline-block';
+
+    var BATCH_SIZE = 50;
+    var batches = [];
+    for (var i = 0; i < usernames.length; i += BATCH_SIZE) {
+        batches.push(usernames.slice(i, i + BATCH_SIZE));
+    }
+
+    var allResults = [];
+    var totalRaw = 0;
+    var droppedInLibrary = 0;
+    var failedBatches = [];
+    var startTime = Date.now();
+
+    function postBatch(batch) {
+        return fetch('/api/discovery-search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                searchType: 'batch',
+                usernames: batch,
+                bioKeywords: bioKeywords,
+                minFollowers: minFollowers,
+                onlyVerified: onlyVerified
+            })
+        }).then(function(resp) { return resp.json(); });
+    }
+
+    function runNext(idx) {
+        if (discoveryBatchStop) { finish(true); return; }
+        if (idx >= batches.length) { finish(false); return; }
+        var secs = Math.floor((Date.now() - startTime) / 1000);
+        statusEl.innerText = '批量检查中... 已完成 ' + idx + ' / ' + batches.length + ' 批（共 ' + usernames.length + ' 个，已等待 ' + secs + ' 秒）';
+
+        postBatch(batches[idx]).then(function(data) {
+            if (discoveryBatchStop) return; // 已停止，丢弃本批结果
+            if (data && data.success) {
+                var list = Array.isArray(data.data) ? data.data : [];
+                totalRaw += data.total || 0;
+                droppedInLibrary += data.droppedInLibrary || 0;
+                allResults = allResults.concat(list);
+            } else {
+                failedBatches.push(idx + 1);
+                console.warn('批量检查 批次 ' + (idx + 1) + ' 失败:', (data && data.error) || '未知错误');
+            }
+        }).catch(function(err) {
+            if (discoveryBatchStop) return;
+            failedBatches.push(idx + 1);
+            console.error('批量检查 批次 ' + (idx + 1) + ' 请求异常:', err);
+        }).then(function() {
+            runNext(idx + 1);
+        });
+    }
+
+    function finish(stopped) {
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (btn) btn.disabled = false;
+
+        // 跨批次合并去重（同名账号只保留第一个）
+        var seen = {};
+        var merged = [];
+        allResults.forEach(function(r) {
+            if (!r || !r.username) return;
+            var k = String(r.username).toLowerCase();
+            if (seen[k]) return;
+            seen[k] = true;
+            merged.push(r);
+        });
+        merged.sort(function(a, b) { return discoveryFollowers(b) - discoveryFollowers(a); });
+
+        discoveryResults = merged;
+        discoverySelected.clear();
+        discoveryDropped = droppedInLibrary;
+        discoveryDroppedInLibrary = droppedInLibrary;
+        discoveryPostsCount = 0;
+        discoveryDerivedCount = 0;
+        discoveryHashtagCount = 0;
+        discoveryTotal = totalRaw;
+        discoveryAfterInternalDedup = 0;
+
+        discoveryApplyFilter();
+        loadApifyUsage();
+
+        // 覆盖状态栏为完成/停止/失败汇总
+        if (stopped) {
+            statusEl.innerText = '已停止，显示已完成的 ' + merged.length + ' 个结果';
+        } else if (failedBatches.length > 0) {
+            statusEl.innerText = '批量检查完成 ' + (batches.length - failedBatches.length) + ' / ' + batches.length + ' 批；失败批次：' + failedBatches.join(', ');
+            showToast('有 ' + failedBatches.length + ' 批失败（批次 ' + failedBatches.join(', ') + '），其余已合并', 'warning');
+        } else {
+            var matchedCount = merged.filter(function(r) { return r.matched; }).length;
+            statusEl.innerText = '批量检查完成：共 ' + usernames.length + ' 个 → 匹配 ' + matchedCount + ' 个 → 显示 ' + merged.length + ' 个';
+        }
+    }
+
+    runNext(0);
+}
+
+function discoveryImportCsv() {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv';
+    input.onchange = function() {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            var usernames = parseUsernamesFromCsv(e.target.result || '');
+            var kw = document.getElementById('discoveryKeyword');
+            if (kw) kw.value = usernames.join('\n');
+            showToast('已导入 ' + usernames.length + ' 个用户名', usernames.length > 0 ? 'success' : 'warning');
+        };
+        reader.readAsText(file, 'UTF-8');
+    };
+    input.click();
+}
+
+// 从 CSV 文本提取用户名（容错：BOM、空行、不同列名、引号包裹）
+function parseUsernamesFromCsv(text) {
+    text = String(text || '').replace(/^﻿/, '');
+    var lines = text.split(/\r\n|\r|\n/);
+    var rows = [];
+    lines.forEach(function(line) {
+        if (String(line).trim() === '') return;
+        rows.push(parseCsvLine(line));
+    });
+    if (rows.length === 0) return [];
+
+    // 找用户名列：优先 username / 用户名 / 账号 / handle，退而求其次 name
+    var firstRow = rows[0] || [];
+    var headerIdx = -1;
+    var priRe = /username|用户名|账号|handle/i;
+    for (var i = 0; i < firstRow.length; i++) {
+        if (priRe.test(firstRow[i])) { headerIdx = i; break; }
+    }
+    if (headerIdx < 0) {
+        for (var j = 0; j < firstRow.length; j++) {
+            if (/name/i.test(firstRow[j])) { headerIdx = j; break; }
+        }
+    }
+
+    var startRow = headerIdx >= 0 ? 1 : 0;
+    var colIdx = headerIdx >= 0 ? headerIdx : 0;
+    var out = [];
+    var seen = {};
+    for (var r = startRow; r < rows.length; r++) {
+        var cell = (rows[r] && rows[r][colIdx] != null) ? String(rows[r][colIdx]).trim() : '';
+        if (!cell) continue;
+        cell = cell.replace(/^https?:\/\//i, '').replace(/^(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/+$/, '').trim();
+        if (!cell) continue;
+        var k = cell.toLowerCase();
+        if (seen[k]) continue;
+        seen[k] = true;
+        out.push(cell);
+    }
+    return out;
+}
+
+// 简单 CSV 行解析：支持双引号包裹（含逗号、转义引号）
+function parseCsvLine(line) {
+    var fields = [];
+    var cur = '';
+    var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (inQuotes) {
+            if (c === '"') {
+                if (line[i + 1] === '"') { cur += '"'; i++; }
+                else { inQuotes = false; }
+            } else {
+                cur += c;
+            }
+        } else {
+            if (c === '"') { inQuotes = true; }
+            else if (c === ',') { fields.push(cur); cur = ''; }
+            else { cur += c; }
+        }
+    }
+    fields.push(cur);
+    return fields;
 }
 
 function discoveryCurrentType() {
