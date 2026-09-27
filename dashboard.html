@@ -440,6 +440,22 @@
             font-size: 20px; flex-shrink: 0;
         }
         .tool-card-arrow { color: #cbd5e1; font-size: 22px; line-height: 1; font-weight: 600; }
+        .tool-card-right { display: flex; align-items: center; gap: 10px; }
+        .tool-delete {
+            display: none;
+            width: 22px; height: 22px;
+            border-radius: 6px;
+            background: #fee2e2;
+            color: #ef4444;
+            font-size: 15px;
+            line-height: 22px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        .tool-card:hover .tool-delete { display: block; }
         .tool-card-name { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
         .tool-card-desc {
             font-size: 13px; color: #94a3b8; line-height: 1.5;
@@ -2101,6 +2117,9 @@
 
         <div id="page-tools" class="page-content">
             <h2 class="page-title">Tools - 工具箱</h2>
+            <div style="margin-bottom:16px;">
+                <button class="btn-primary" onclick="showAddToolModal()">➕ 添加工具</button>
+            </div>
             <div class="tools-grid" id="toolsGrid"></div>
         </div>
 
@@ -2179,6 +2198,24 @@
             <button class="btn-secondary" onclick="cdManualAddPost()" style="margin-top:10px;width:100%;">+ 添加帖子</button>
         </div>
         <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('cdManualModal')">取消</button><button class="btn-primary" onclick="cdSubmitManual()">保存</button></div>
+    </div>
+</div>
+
+<!-- 添加工具弹窗 -->
+<div id="addToolModal" class="modal" style="display:none;">
+    <div class="modal-content" style="width:450px;">
+        <div class="modal-header"><h3>添加工具</h3><button onclick="closeModal('addToolModal')">×</button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>工具名称 <span style="color:red;">*</span></label><input type="text" id="toolName" placeholder="如 PayPal 手续费计算"></div>
+            <div class="form-group"><label>网址 <span style="color:red;">*</span></label><input type="text" id="toolUrl" placeholder="https://..."></div>
+            <div class="form-group"><label>简介</label><input type="text" id="toolDesc" placeholder="一句话描述"></div>
+            <div class="form-group"><label>图标 emoji</label><input type="text" id="toolIcon" value="🌐"></div>
+            <div class="form-group"><label>颜色</label><input type="text" id="toolColor" value="#4f46e5"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal('addToolModal')">取消</button>
+            <button class="btn-primary" onclick="saveNewTool()">保存</button>
+        </div>
     </div>
 </div>
 
@@ -5349,39 +5386,109 @@
         });
     }
 
+    var toolsList = [];
+
     function loadTools() {
-        var grid = document.getElementById('toolsGrid');
-        if (!grid) return;
-        fetch('/tools_config.json')
+        fetch('/api/tools')
             .then(function(resp) { return resp.json(); })
-            .then(function(tools) {
-                tools = Array.isArray(tools) ? tools : [];
-                if (tools.length === 0) {
-                    grid.innerHTML = '<div class="tools-empty">暂无工具，请在 tools_config.json 中添加</div>';
-                    return;
-                }
-                var html = '';
-                tools.forEach(function(t) {
-                    var url = t && t.url ? String(t.url) : '#';
-                    var name = escHTML((t && t.name) || '');
-                    var desc = escHTML((t && t.desc) || '');
-                    var icon = escHTML((t && t.icon) || '🔗');
-                    var color = (t && t.color) ? String(t.color) : '#4f46e5';
-                    html += '<a class="tool-card" href="' + escAttr(url) + '" target="_blank" rel="noopener noreferrer">' +
-                        '<div class="tool-card-top">' +
-                            '<div class="tool-card-icon" style="background:' + escAttr(color) + ';">' + icon + '</div>' +
-                            '<span class="tool-card-arrow">›</span>' +
-                        '</div>' +
-                        '<div class="tool-card-name">' + name + '</div>' +
-                        '<div class="tool-card-desc">' + desc + '</div>' +
-                        '</a>';
-                });
-                grid.innerHTML = html;
+            .then(function(data) {
+                toolsList = Array.isArray(data) ? data : [];
+                renderTools();
             })
             .catch(function() {
-                grid.innerHTML = '<div class="tools-empty">暂无工具，请在 tools_config.json 中添加</div>';
+                toolsList = [];
+                renderTools();
             });
     }
+
+    function renderTools() {
+        var grid = document.getElementById('toolsGrid');
+        if (!grid) return;
+        if (toolsList.length === 0) {
+            grid.innerHTML = '<div class="tools-empty">暂无工具，点击「添加工具」新增</div>';
+            return;
+        }
+        var html = '';
+        toolsList.forEach(function(t, idx) {
+            var url = t && t.url ? String(t.url) : '#';
+            var name = escHTML((t && t.name) || '');
+            var desc = escHTML((t && t.desc) || '');
+            var icon = escHTML((t && t.icon) || '🌐');
+            var color = (t && t.color) ? String(t.color) : '#4f46e5';
+            html += '<div class="tool-card" data-url="' + escAttr(url) + '">' +
+                '<div class="tool-card-top">' +
+                    '<div class="tool-card-icon" style="background:' + escAttr(color) + ';">' + icon + '</div>' +
+                    '<div class="tool-card-right">' +
+                        '<span class="tool-delete" data-idx="' + idx + '" title="删除">×</span>' +
+                        '<span class="tool-card-arrow">›</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="tool-card-name">' + name + '</div>' +
+                '<div class="tool-card-desc">' + desc + '</div>' +
+                '</div>';
+        });
+        grid.innerHTML = html;
+    }
+
+    function saveTools() {
+        fetch('/api/tools', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(toolsList)
+        })
+            .then(function(resp) { return resp.json(); })
+            .then(function() {
+                renderTools();
+                showToast('已保存', 'success');
+            })
+            .catch(function() {
+                showToast('保存失败，请重试', 'error');
+                loadTools();
+            });
+    }
+
+    function showAddToolModal() {
+        document.getElementById('toolName').value = '';
+        document.getElementById('toolUrl').value = '';
+        document.getElementById('toolDesc').value = '';
+        document.getElementById('toolIcon').value = '🌐';
+        document.getElementById('toolColor').value = '#4f46e5';
+        document.getElementById('addToolModal').style.display = 'flex';
+    }
+
+    function saveNewTool() {
+        var name = document.getElementById('toolName').value.trim();
+        var url = document.getElementById('toolUrl').value.trim();
+        var desc = document.getElementById('toolDesc').value.trim();
+        var icon = document.getElementById('toolIcon').value.trim() || '🌐';
+        var color = document.getElementById('toolColor').value.trim() || '#4f46e5';
+        if (!name) { showToast('请输入工具名称', 'warning'); return; }
+        if (!url) { showToast('请输入网址', 'warning'); return; }
+        if (!/^https?:\/\//i.test(url)) { showToast('网址需以 http:// 或 https:// 开头', 'warning'); return; }
+        toolsList.push({ name: name, url: url, desc: desc, icon: icon, color: color });
+        closeModal('addToolModal');
+        saveTools();
+    }
+
+    function deleteTool(idx) {
+        if (!toolsList[idx]) return;
+        if (!confirm('确定删除工具「' + toolsList[idx].name + '」吗？')) return;
+        toolsList.splice(idx, 1);
+        saveTools();
+    }
+
+    document.getElementById('toolsGrid').addEventListener('click', function(e) {
+        var del = e.target.closest('.tool-delete');
+        if (del) {
+            deleteTool(parseInt(del.getAttribute('data-idx'), 10));
+            return;
+        }
+        var card = e.target.closest('.tool-card');
+        if (card) {
+            var url = card.getAttribute('data-url');
+            if (url && url !== '#') window.open(url, '_blank');
+        }
+    });
 
     var navItems = document.querySelectorAll('.nav-item');
     var pages = document.querySelectorAll('.page-content');

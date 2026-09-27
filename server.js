@@ -18,6 +18,7 @@ const PIPELINE_DATA_FILE = path.join(__dirname, 'pipeline_data.json');
 const CD_DATA_FILE = path.join(__dirname, 'cd_data.json');
 const PAYMENT_DATA_FILE = path.join(__dirname, 'payment_data.json');
 const EMAIL_CONFIG_FILE = path.join(__dirname, 'email_config.json');
+const TOOLS_CONFIG_FILE = path.join(__dirname, 'tools_config.json');
 
 // Apify 配置（凭证不入库，读取根目录 apify_config.json）
 let APIFY_TOKEN = '';
@@ -162,6 +163,38 @@ function createServer() {
   // Serve tools_config.json（Tools 工具箱配置）
   if (pathname === '/tools_config.json' && req.method === 'GET') {
     serveStatic(res, path.join(__dirname, 'tools_config.json'));
+    return;
+  }
+
+  // GET /api/tools — 读工具列表
+  if (pathname === '/api/tools' && req.method === 'GET') {
+    try {
+      let tools = [];
+      if (fs.existsSync(TOOLS_CONFIG_FILE)) {
+        tools = JSON.parse(fs.readFileSync(TOOLS_CONFIG_FILE, 'utf8'));
+      }
+      if (!Array.isArray(tools)) tools = [];
+      sendJSON(res, 200, tools);
+    } catch (err) {
+      console.error('[tools] GET error:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/tools — 写回工具列表
+  if (pathname === '/api/tools' && req.method === 'POST') {
+    parseBody(req).then((body) => {
+      try {
+        const arr = Array.isArray(body) ? body : [];
+        fs.writeFileSync(TOOLS_CONFIG_FILE, JSON.stringify(arr, null, 2));
+        console.log('[tools] 保存成功:', arr.length, '个工具');
+        sendJSON(res, 200, { success: true });
+      } catch (err) {
+        console.error('[tools] POST error:', err.message);
+        sendJSON(res, 500, { error: err.message });
+      }
+    }).catch(err => sendJSON(res, 400, { error: err.message }));
     return;
   }
 
