@@ -487,6 +487,24 @@
         .tool-card-add-plus { font-size: 32px; line-height: 1; transition: transform 0.2s ease; }
         .tool-card-add:hover .tool-card-add-plus { transform: scale(1.2); }
         .tool-card-add-text { font-size: 14px; font-weight: 600; }
+        .emoji-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+        .emoji-opt {
+            width: 32px; height: 32px; border-radius: 8px;
+            background: #fff; border: 1px solid #e2e8f0;
+            font-size: 18px; line-height: 1; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0; transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .emoji-opt:hover { background: #f5f3ff; border-color: #c7d2fe; }
+        .emoji-opt.selected { background: #4f46e5; border-color: #4f46e5; }
+        .color-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+        .color-opt {
+            width: 32px; height: 32px; border-radius: 8px;
+            cursor: pointer; border: 2px solid transparent;
+            padding: 0; transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .color-opt:hover { transform: scale(1.1); }
+        .color-opt.selected { border-color: #fff; box-shadow: 0 0 0 2px #4f46e5, 0 2px 6px rgba(0,0,0,0.2); }
         @media (max-width: 1100px) { .tools-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 640px) { .tools-grid { grid-template-columns: 1fr; } }
         /* Outreach 操作按钮组 —— .outreach-toolbar 里的左侧一组
@@ -2229,8 +2247,16 @@
             <div class="form-group"><label>工具名称 <span style="color:red;">*</span></label><input type="text" id="toolName" placeholder="如 PayPal 手续费计算"></div>
             <div class="form-group"><label>网址 <span style="color:red;">*</span></label><input type="text" id="toolUrl" placeholder="https://..."></div>
             <div class="form-group"><label>简介</label><input type="text" id="toolDesc" placeholder="一句话描述"></div>
-            <div class="form-group"><label>图标 emoji</label><input type="text" id="toolIcon" value="🌐"></div>
-            <div class="form-group"><label>颜色</label><input type="text" id="toolColor" value="#4f46e5"></div>
+            <div class="form-group">
+                <label>图标 emoji</label>
+                <div class="emoji-picker" id="toolEmojiPicker"></div>
+                <input type="text" id="toolIcon" placeholder="或直接粘贴 emoji" style="margin-top:8px;">
+            </div>
+            <div class="form-group">
+                <label>颜色</label>
+                <div class="color-picker" id="toolColorPicker"></div>
+                <input type="text" id="toolColor" placeholder="或输入 hex（如 #4f46e5）" style="margin-top:8px;">
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn-secondary" onclick="closeModal('addToolModal')">取消</button>
@@ -5467,12 +5493,51 @@
             });
     }
 
+    var TOOL_EMOJIS = ['🔗','🌐','📊','📈','📉','💰','💳','🛒','✂️','🖼️','📄','📝','📋','🎨','🎬','🎵','📷','🔍','🛠️','⚙️','💡','⭐','❤️','✅','📌','🎯','🚀','🔔','📁','🔒'];
+    var TOOL_COLORS = ['#4f46e5','#10b981','#ef4444','#f59e0b','#3b82f6','#8b5cf6','#ec4899','#14b8a6'];
+
+    function renderToolEmojiPicker() {
+        var el = document.getElementById('toolEmojiPicker');
+        if (!el) return;
+        var html = '';
+        TOOL_EMOJIS.forEach(function(e) {
+            html += '<button type="button" class="emoji-opt" data-emoji="' + e + '">' + e + '</button>';
+        });
+        el.innerHTML = html;
+    }
+
+    function renderToolColorPicker() {
+        var el = document.getElementById('toolColorPicker');
+        if (!el) return;
+        var html = '';
+        TOOL_COLORS.forEach(function(c) {
+            html += '<button type="button" class="color-opt" data-color="' + c + '" style="background:' + c + ';"></button>';
+        });
+        el.innerHTML = html;
+    }
+
+    function selectToolEmoji(emoji) {
+        document.getElementById('toolIcon').value = emoji;
+        document.querySelectorAll('#toolEmojiPicker .emoji-opt').forEach(function(b) {
+            if (b.getAttribute('data-emoji') === emoji) b.classList.add('selected');
+            else b.classList.remove('selected');
+        });
+    }
+
+    function selectToolColor(color) {
+        document.getElementById('toolColor').value = color;
+        document.querySelectorAll('#toolColorPicker .color-opt').forEach(function(b) {
+            if (b.getAttribute('data-color') === color) b.classList.add('selected');
+            else b.classList.remove('selected');
+        });
+    }
+
     function showAddToolModal() {
         document.getElementById('toolName').value = '';
         document.getElementById('toolUrl').value = '';
         document.getElementById('toolDesc').value = '';
-        document.getElementById('toolIcon').value = '🌐';
-        document.getElementById('toolColor').value = '#4f46e5';
+        selectToolEmoji('🔗');
+        selectToolColor('#4f46e5');
         document.getElementById('addToolModal').style.display = 'flex';
     }
 
@@ -5480,7 +5545,7 @@
         var name = document.getElementById('toolName').value.trim();
         var url = document.getElementById('toolUrl').value.trim();
         var desc = document.getElementById('toolDesc').value.trim();
-        var icon = document.getElementById('toolIcon').value.trim() || '🌐';
+        var icon = document.getElementById('toolIcon').value.trim() || '🔗';
         var color = document.getElementById('toolColor').value.trim() || '#4f46e5';
         if (!name) { showToast('请输入工具名称', 'warning'); return; }
         if (!url) { showToast('请输入网址', 'warning'); return; }
@@ -5512,6 +5577,25 @@
             var url = card.getAttribute('data-url');
             if (url && url !== '#') window.open(url, '_blank');
         }
+    });
+
+    renderToolEmojiPicker();
+    renderToolColorPicker();
+    document.getElementById('toolEmojiPicker').addEventListener('click', function(e) {
+        var btn = e.target.closest('.emoji-opt');
+        if (!btn) return;
+        selectToolEmoji(btn.getAttribute('data-emoji'));
+    });
+    document.getElementById('toolColorPicker').addEventListener('click', function(e) {
+        var btn = e.target.closest('.color-opt');
+        if (!btn) return;
+        selectToolColor(btn.getAttribute('data-color'));
+    });
+    document.getElementById('toolIcon').addEventListener('input', function() {
+        document.querySelectorAll('#toolEmojiPicker .emoji-opt.selected').forEach(function(b) { b.classList.remove('selected'); });
+    });
+    document.getElementById('toolColor').addEventListener('input', function() {
+        document.querySelectorAll('#toolColorPicker .color-opt.selected').forEach(function(b) { b.classList.remove('selected'); });
     });
 
     var navItems = document.querySelectorAll('.nav-item');
