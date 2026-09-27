@@ -2095,7 +2095,8 @@
 
                 <div id="discoveryHint" style="font-size:13px;color:#64748b;margin-bottom:12px;">
                     搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>
-                    话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。
+                    话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。<br>
+                    <span style="color:#7c3aed;font-weight:600;">💡 适合：广撒网、找新人、没有种子账号时用。</span>
                 </div>
 
                 <div class="filter-bar" style="gap:12px;flex-wrap:wrap;">
@@ -9219,10 +9220,10 @@ function loadApifyUsage() {
 }
 
 var discoveryHints = {
-    hashtag: '搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。',
-    url: '输入 Instagram 主页 URL，直接抓取该账号的资料（粉丝数、简介、认证）。<br>每次约 $0.003/账号，速度快。',
-    similar: '输入种子账号，Apify 帮你找 Instagram 推荐的相关账号。<br>每次约 $0.2-0.4，耗时 5-6 分钟，请耐心等待。<br>结果精准度高，适合找同领域、同风格的人。',
-    batch: '上传/粘贴用户名列表（每批最多 50 个），批量拉取资料。<br>自动按关键词匹配简介，筛选符合条件的红人。<br>每个账号约 $0.003，一次 50 个约 $0.13。'
+    hashtag: '搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：广撒网、找新人、没有种子账号时用。</span>',
+    url: '输入 Instagram 主页 URL，直接抓取该账号的资料（粉丝数、简介、认证）。<br>每次约 $0.003/账号，速度快。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：已知具体账号，想快速拉资料、验证信息。</span>',
+    similar: '输入种子账号，Apify 帮你找 Instagram 推荐的相关账号。<br>每次约 $0.2-0.4，耗时 5-6 分钟，请耐心等待。<br>结果精准度高，适合找同领域、同风格的人。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：已有优质种子（大网红），想找同款、深挖同一圈层。</span>',
+    batch: '上传/粘贴用户名列表（每批最多 50 个），批量拉取资料。<br>自动按关键词匹配简介，筛选符合条件的红人。<br>每个账号约 $0.003，一次 50 个约 $0.13。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：已有名单，想批量筛简介是否相关（如含 amazon / lifestyle）。</span>'
 };
 
 function discoveryUpdateHint() {
