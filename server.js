@@ -766,7 +766,8 @@ function createServer() {
             channel: 'Instagram',
             status: 'Connected',
             note: note,
-            id: id
+            id: id,
+            favorited: false
           });
           existingNames.add(uname.toLowerCase());
           added++;

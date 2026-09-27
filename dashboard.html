@@ -653,6 +653,29 @@
             background: #f8fafc;
             color: #7c3aed;
         }
+        /* ===== 批量操作：复用「添加红人」的悬停下拉，只补禁用/激活/子菜单 ===== */
+        .outreach-actions .batch-action-btn { gap: 4px; }
+        .outreach-actions .batch-action-btn.active { background: #4f46e5; color: white; border: 1px solid #4f46e5; }
+        .outreach-actions .batch-action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .batch-dropdown.disabled { pointer-events: none; }
+        /* 状态子菜单：悬停「一键修改状态」时向右展开 */
+        .batch-status-item { position: relative; }
+        .batch-status-menu {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            border: 1px solid #eef2f7;
+            padding: 6px 0;
+            min-width: 150px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(-4px);
+            transition: opacity 0.2s, visibility 0.2s, transform 0.2s;
+        }
+        .batch-status-item:hover .batch-status-menu { opacity: 1; visibility: visible; transform: translateX(0); }
         /* Outreach 工具栏 —— 第 2 行：左操作按钮 + 右筛选标签，同一行两端对齐 */
         .outreach-toolbar {
             display: flex;
@@ -1662,8 +1685,32 @@
                                 <div class="add-influencer-menu-item" onclick="openAddInfluencerModal()">✏️ 手动新增</div>
                             </div>
                         </div>
-                        <button id="clearSelectedBtn" class="btn-secondary" style="display: none;" onclick="clearSelectedInfluencers()">清除选中</button>
-                        <button id="deleteSelectedBtn" class="btn-danger" style="display: none;" onclick="batchDelete()">删除选中</button>
+                        <!-- 批量操作：悬停展开「清除选中 / 删除选中 / 一键修改状态 / 一键收藏」 -->
+                        <div class="add-influencer-dropdown batch-dropdown disabled" id="batchActionDropdown">
+                            <button class="btn-secondary batch-action-btn" id="batchActionBtn" disabled>
+                                ✏️ 批量操作 <span class="dropdown-arrow">▾</span>
+                            </button>
+                            <div class="add-influencer-menu">
+                                <div class="add-influencer-menu-item" onclick="clearSelectedInfluencers()">✓ 清除选中</div>
+                                <div class="add-influencer-menu-item" onclick="batchDelete()">🗑️ 删除选中</div>
+                                <div class="add-influencer-menu-item batch-status-item">
+                                    🔄 一键修改状态
+                                    <div class="batch-status-menu">
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('Connected')">Connected</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('Confirm')">Confirm</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('Reject')">Reject</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('order-pending')">Order-pending</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('sampling')">Sampling</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('delivered')">Delivered</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('partial-posted')">Partial-posted</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('posted')">Posted</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('overdue')">Overdue</div>
+                                        <div class="add-influencer-menu-item" onclick="batchApplyStatus('Long-term')">Long-term</div>
+                                    </div>
+                                </div>
+                                <div class="add-influencer-menu-item" onclick="batchFavorite()">⭐ 一键收藏</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 中间弹性空白：把操作按钮和筛选标签顶到两端 -->
@@ -1673,6 +1720,7 @@
                     <div class="outreach-nav">
                         <button class="nav-clear-btn" id="navClearBtn" onclick="clearAllFilters()" style="display:none;">✕ 清除筛选</button>
                         <button class="nav-today-btn" id="navTodayBtn" onclick="filterToday()">只看今日</button>
+                        <button class="nav-today-btn" id="navFavoriteBtn" onclick="filterFavorites()">⭐ 收藏夹红人</button>
                         <div class="filter-nav-item" id="navStatus" onclick="toggleNavDropdown('status', event)">
                             <span class="nav-label">Status</span>
                             <span class="nav-arrow">▾</span>
@@ -2453,6 +2501,7 @@
     var allInfluencers = [], filteredInfluencers = [], currentPage = 1, pageSize = 20, activeStatuses = [], activeBrands = [], activeChannels = [];
     var selectedInfluencerIds = new Set();  // 跨页保持勾选状态，存储唯一 id
     var isTodayFilterActive = false;  // ★ 记录「只看今日」是否激活
+    var isFavoriteFilterActive = false;  // ★ 记录「收藏夹红人」筛选是否激活
     // 状态显示映射：key 为数据存储值，value 为显示值
     var statusDisplayMap = {
         'Connected': 'Connected', 'Confirm': 'Confirm', 'Reject': 'Reject',
@@ -2994,6 +3043,7 @@
                 if (!item.id) {
                     item.id = Date.now() + '_' + index + '_' + item.email;
                 }
+                if (item.favorited === undefined) item.favorited = false;
             });
             sortInfluencersByDate();
             filteredInfluencers = [...allInfluencers];
@@ -3180,9 +3230,9 @@
             badge.textContent = total;
             badge.style.display = total > 0 ? 'inline-flex' : 'none';
         }
-        // 「只看今日」也是一个筛选条件，所以只开它时也给出「清除筛选」
+        // 「只看今日」/「收藏夹红人」也是筛选条件，所以只开它们时也给出「清除筛选」
         if (clearBtn) {
-            clearBtn.style.display = (total > 0 || isTodayFilterActive) ? 'inline-block' : 'none';
+            clearBtn.style.display = (total > 0 || isTodayFilterActive || isFavoriteFilterActive) ? 'inline-block' : 'none';
         }
 
         toggleNavItemActive('navStatus', activeStatuses.length > 0);
@@ -3190,12 +3240,14 @@
         toggleNavItemActive('navChannel', activeChannels.length > 0);
         // filterInfluencers() 会关掉「只看今日」，高亮统一在这里同步
         toggleNavItemActive('navTodayBtn', isTodayFilterActive);
+        toggleNavItemActive('navFavoriteBtn', isFavoriteFilterActive);
     }
 
     function clearAllFilters() {
         activeStatuses = [];
         activeBrands = [];
         activeChannels = [];
+        isFavoriteFilterActive = false;
         closeNavDropdown();
         // filterInfluencers() 内部会关掉「只看今日」并刷新按钮/徽章状态
         filterInfluencers();
@@ -3237,6 +3289,14 @@
     // 状态以 isTodayFilterActive 为准，按钮高亮统一由 updateNavState() 同步
     function filterToday() {
         isTodayFilterActive = !isTodayFilterActive;
+        currentPage = 1;
+        updateNavState();
+        applyFiltersAndRender();
+    }
+
+    // ── 收藏夹红人：只看已收藏（与「只看今日」独立，AND 关系） ──
+    function filterFavorites() {
+        isFavoriteFilterActive = !isFavoriteFilterActive;
         currentPage = 1;
         updateNavState();
         applyFiltersAndRender();
@@ -3286,6 +3346,8 @@
             )) return false;
             // ★ 只看今日筛选
             if (isTodayFilterActive && item.date !== todayStr) return false;
+            // ★ 收藏夹筛选（与其它筛选 AND 关系）
+            if (isFavoriteFilterActive && item.favorited !== true) return false;
             return true;
         });
 
@@ -3371,7 +3433,10 @@
                     '<td>' + escHTML(item.channel || '-') + '</td>' +
                     '<td><span class="status-badge status-' + item.status + '" onclick="showStatusMenu(event, \'' + escHTML(item.email) + '\', \'' + item.status + '\')" style="cursor:pointer;">' + (statusDisplayMap[item.status] || item.status) + '</span></td>' +
                     '<td>' + escHTML(item.note || '-') + '</td>' +
-                    '<td><button class="edit-icon-btn" onclick="startEdit(\'' + item.id + '\')" title="编辑">✏️</button></td>' +
+                    '<td><div class="action-buttons">' +
+                    '<button class="icon-btn favorite-btn' + (item.favorited ? ' favorited' : '') + '" onclick="toggleInfluencerFavorite(\'' + item.id + '\')" title="' + (item.favorited ? '取消收藏' : '收藏') + '">' + (item.favorited ? '⭐' : '☆') + '</button>' +
+                    '<button class="edit-icon-btn" onclick="startEdit(\'' + item.id + '\')" title="编辑">✏️</button>' +
+                    '</div></td>' +
                     '</tr>';
             }
         });
@@ -3760,11 +3825,14 @@
     }
 
     function updateToolbarButtons() {
-        var clearBtn = document.getElementById('clearSelectedBtn');
-        var deleteBtn = document.getElementById('deleteSelectedBtn');
+        var batchBtn = document.getElementById('batchActionBtn');
+        var dropdown = document.getElementById('batchActionDropdown');
         var hasSelected = selectedInfluencerIds.size > 0;
-        if (clearBtn) clearBtn.style.display = hasSelected ? 'inline-block' : 'none';
-        if (deleteBtn) deleteBtn.style.display = hasSelected ? 'inline-block' : 'none';
+        if (batchBtn) {
+            batchBtn.disabled = !hasSelected;
+            batchBtn.classList.toggle('active', hasSelected);
+        }
+        if (dropdown) dropdown.classList.toggle('disabled', !hasSelected);
     }
 
     function importCSV() {
@@ -3850,7 +3918,8 @@
                             channel: rawChannel || '',
                             note: rawNote || '',
                             status: 'Connected',
-                            date: todayStr()
+                            date: todayStr(),
+                            favorited: false
                         });
                         importedCount++;
                     } else {
@@ -4050,7 +4119,8 @@
             channel: channel,
             note: note,
             status: 'Connected',
-            date: todayStr()
+            date: todayStr(),
+            favorited: false
         };
 
         allInfluencers.push(newInfluencer);
@@ -4084,6 +4154,43 @@
         var newDate = document.getElementById('batchNewDate').value;
         if (newDate) { var formatted = newDate.replace(/-/g, '/'); allInfluencers = allInfluencers.map(function(item) { if (selectedInfluencerIds.has(item.id)) item.date = formatted; return item; }); saveInfluencers(false); }
         closeModal('batchDateModal');
+    }
+
+    // ── 批量操作：一键修改状态（子菜单直接传状态值） ──
+    function batchApplyStatus(newStatus) {
+        if (selectedInfluencerIds.size === 0) { alert('请至少选择一个红人'); return; }
+        var count = selectedInfluencerIds.size;
+        allInfluencers.forEach(function(item) {
+            if (selectedInfluencerIds.has(item.id)) {
+                item.status = newStatus;
+                if (newStatus === 'order-pending') syncToPipeline(item);
+            }
+        });
+        saveInfluencers(false);
+        showToast('已修改 ' + count + ' 个红人状态为 ' + (statusDisplayMap[newStatus] || newStatus), 'success');
+    }
+
+    // ── 批量操作：一键收藏（把选中的红人全部标记 favorited: true） ──
+    function batchFavorite() {
+        if (selectedInfluencerIds.size === 0) { alert('请至少选择一个红人'); return; }
+        var count = 0;
+        allInfluencers.forEach(function(item) {
+            if (selectedInfluencerIds.has(item.id) && item.favorited !== true) {
+                item.favorited = true;
+                count++;
+            }
+        });
+        saveInfluencers(false);
+        showToast(count > 0 ? '⭐ 已收藏 ' + count + ' 个红人' : '所选红人均已收藏', count > 0 ? 'success' : 'warning');
+    }
+
+    // ── 单条收藏 / 取消收藏（表格操作列 ⭐ 按钮） ──
+    function toggleInfluencerFavorite(id) {
+        var item = allInfluencers.find(function(i) { return i.id === id; });
+        if (!item) return;
+        item.favorited = !item.favorited;
+        saveInfluencers(false);
+        showToast(item.favorited ? '⭐ 已收藏该红人' : '已取消收藏', 'success');
     }
 
     function arrangeSampling() {
