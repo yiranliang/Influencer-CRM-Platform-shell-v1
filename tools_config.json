@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "name": "PayPal 手续费计算",
+    "url": "https://mjzj.com/tools/paypalcompute",
+    "icon": "💰",
+    "desc": "计算 PayPal 收款手续费",
+    "color": "#4f46e5"
+  },
+  {
+    "name": "去背景",
+    "url": "https://www.remove.bg/zh/upload",
+    "icon": "✂️",
+    "desc": "一键去除图片背景",
+    "color": "#10b981"
+  },
+  {
+    "name": "iLovePDF",
+    "url": "https://www.ilovepdf.com/",
+    "icon": "📄",
+    "desc": "PDF 合并、拆分、压缩、转换",
+    "color": "#ef4444"
+  }
+]
