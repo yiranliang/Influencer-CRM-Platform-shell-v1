@@ -397,17 +397,30 @@ function createServer() {
         if (seeds.some(function (x) { return x.toLowerCase() === clean.toLowerCase(); })) return;
         seeds.push(clean);
       });
+      // 批量检查名单：用户名列表（去 @、去空格、去 URL 前缀，最多 50 个）
+      const batchUsernames = [];
+      (Array.isArray(body.usernames) ? body.usernames : []).forEach(function (u) {
+        const raw = String(u || '').trim();
+        if (!raw) return;
+        const clean = raw.replace(/^https?:\/\//i, '').replace(/^(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/+$/, '').trim();
+        if (!clean) return;
+        if (batchUsernames.length >= 50) return;
+        if (batchUsernames.some(function (x) { return x.toLowerCase() === clean.toLowerCase(); })) return;
+        batchUsernames.push(clean);
+      });
       let limit = parseInt(body.resultsLimit, 10);
       if (isNaN(limit) || limit < 10) limit = APIFY_RESULTS_LIMIT; // 默认 30
       if (limit > 100) limit = 100;
-      if (!keyword && searchType !== 'similar') { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
+      if (!keyword && searchType !== 'similar' && searchType !== 'batch') { sendJSON(res, 400, { success: false, error: '关键词为空' }); return; }
       if (searchType === 'similar' && seeds.length === 0) { sendJSON(res, 400, { success: false, error: '请至少输入 1 个种子账号' }); return; }
+      if (searchType === 'batch' && batchUsernames.length === 0) { sendJSON(res, 400, { success: false, error: '请至少输入 1 个用户名' }); return; }
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
 
       const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
       const APIFY_DETAILS_ACTOR = 'apify~instagram-scraper';
       const APIFY_HASHTAG_ACTOR = 'apify~instagram-hashtag-scraper';
       const APIFY_SIMILAR_ACTOR = 'zaver.api~instagram-similar-profiles-finder';
+      const APIFY_PROFILE_ACTOR = 'apify~instagram-profile-scraper';
       function apifyUrl(actorId) {
         return 'https://api.apify.com/v2/acts/' + actorId + '/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN);
       }
@@ -449,6 +462,7 @@ function createServer() {
         let hashtagCount = 0;     // 本次搜索合并的话题标签数（URL 模式为 0）
         let afterInternalDedup = 0; // 相似发现：内部去重后的数量
         let similarRawCount = 0;    // 相似发现：Apify 原始返回数
+        let batchTotal = 0;         // 批量检查：Apify 原始返回数
 
         const influencerNames = loadInfluencerNames();
 
@@ -491,6 +505,65 @@ function createServer() {
             freshSimilar.push(it);
           });
           profiles = freshSimilar;
+          droppedInLibrary = droppedLib;
+        } else if (searchType === 'batch') {
+          // 批量检查名单：用 Instagram Profile Scraper 一次抓最多 50 个账号的资料
+          const bioKeywords = (Array.isArray(body.bioKeywords) ? body.bioKeywords : []).map(function (k) { return String(k || '').trim(); }).filter(function (k) { return k.length > 0; });
+          if (bioKeywords.length === 0) bioKeywords.push('amazon'); // 默认简介关键词
+          let minFollowers = parseInt(body.minFollowers, 10);
+          if (isNaN(minFollowers) || minFollowers < 0) minFollowers = 5000;
+          const onlyVerified = !!body.onlyVerified;
+
+          const rawProfiles = await callApify(APIFY_PROFILE_ACTOR, { usernames: batchUsernames, addProfileStatistics: true }, '批量检查', 300000);
+          batchTotal = rawProfiles.length;
+
+          // 关键词匹配：简介 + 最新帖子 caption 拼接后小写，做「包含」判断
+          const enriched = rawProfiles.map(function (it) {
+            const username = it.username || '';
+            const fullName = it.fullName || it.full_name || it.name || '';
+            const followersCount = it.followersCount != null ? it.followersCount : (it.followers_count != null ? it.followers_count : 0);
+            const postsCount = it.postsCount != null ? it.postsCount : (it.posts_count != null ? it.posts_count : 0);
+            const biography = it.biography || it.bio || '';
+            const verified = !!it.verified;
+            const businessCategoryName = it.businessCategoryName || it.business_category_name || '';
+            const latestPosts = Array.isArray(it.latestPosts) ? it.latestPosts : [];
+            const parts = [biography];
+            latestPosts.forEach(function (lp) { if (lp && lp.caption) parts.push(lp.caption); });
+            const combined = parts.join(' ').toLowerCase();
+            const matchedKeywords = bioKeywords.filter(function (k) { return combined.indexOf(String(k).toLowerCase()) !== -1; });
+            return {
+              username: username,
+              fullName: fullName,
+              followersCount: followersCount,
+              postsCount: postsCount,
+              biography: biography,
+              verified: verified,
+              businessCategoryName: businessCategoryName,
+              matched: matchedKeywords.length > 0,
+              matchedKeywords: matchedKeywords
+            };
+          });
+
+          // 过滤粉丝数 / 认证
+          const filtered = enriched.filter(function (it) {
+            if (it.followersCount < minFollowers) return false;
+            if (onlyVerified && !it.verified) return false;
+            return true;
+          });
+
+          // 去重：内部按用户名去重 + 过滤红人库已有账号
+          const seen = new Set();
+          const freshBatch = [];
+          let droppedLib = 0;
+          filtered.forEach(function (it) {
+            if (!it.username) return;
+            const uname = String(it.username).toLowerCase();
+            if (seen.has(uname)) return;
+            seen.add(uname);
+            if (influencerNames.has(uname)) { droppedLib++; return; }
+            freshBatch.push(it);
+          });
+          profiles = freshBatch;
           droppedInLibrary = droppedLib;
         } else {
           // 话题标签：第 1 步用官方 Hashtag Scraper 抓最近发布的帖子，第 2 步反推创作者详情
@@ -548,6 +621,11 @@ function createServer() {
             const uname = String(it.username).toLowerCase();
             if (influencerNames.has(uname)) { droppedInLibrary++; return; }
             fresh.push(it);
+          });
+        } else if (searchType === 'batch') {
+          rawCount = batchTotal;
+          profiles.forEach(function (it) {
+            if (it && it.username) fresh.push(it);
           });
         } else {
           rawCount = profiles.length;

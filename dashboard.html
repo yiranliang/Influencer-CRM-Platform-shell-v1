@@ -1925,6 +1925,7 @@
                         <option value="hashtag">话题标签找红人</option>
                         <option value="url">已知 URL 抓取</option>
                         <option value="similar">相似红人发现</option>
+                        <option value="batch">批量检查名单</option>
                     </select>
                     <div class="search-wrapper" style="flex:1;min-width:260px;">
                         <input type="text" id="discoveryKeyword" class="search-input" style="width:100%;" placeholder="输入话题标签，如 yoga、fitness（不用加 #）" onkeydown="if(event.key==='Enter'){discoverySearch();}">
@@ -1956,6 +1957,15 @@
                     <input type="number" id="discoverySimilarMaxProfiles" value="200" style="width:100px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
                 </div>
 
+                <div id="discoveryBatchOptions" style="display:none;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+                    <label style="font-size:13px;color:#475569;white-space:nowrap;">简介关键词</label>
+                    <input type="text" id="discoveryBatchBioKeywords" value="amazon" style="width:180px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;" placeholder="逗号分隔，如 amazon, mom, fashion">
+                    <label style="font-size:13px;color:#475569;white-space:nowrap;margin-left:8px;">最少粉丝数</label>
+                    <input type="number" id="discoveryBatchMinFollowers" value="5000" style="width:100px;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                    <label style="font-size:13px;color:#475569;white-space:nowrap;margin-left:8px;">只看认证</label>
+                    <input type="checkbox" id="discoveryBatchOnlyVerified" style="cursor:pointer;">
+                </div>
+
                 <div id="apifyUsage" style="font-size:12px;color:#64748b;margin-bottom:8px;">Apify 额度：加载中…</div>
 
                 <div style="font-size:13px;color:#64748b;margin-bottom:12px;">
@@ -1972,6 +1982,10 @@
                     <input type="checkbox" id="discoveryVerifiedOnly" onchange="discoveryApplyFilter()" style="cursor:pointer;">
                     <label style="font-size:13px;color:#475569;margin-left:8px;">只看创作者：</label>
                     <input type="checkbox" id="discoveryCreatorOnly" checked onchange="discoveryApplyFilter()" style="cursor:pointer;">
+                    <span id="discoveryBatchMatchedFilter" style="display:none;align-items:center;gap:6px;">
+                        <label style="font-size:13px;color:#475569;margin-left:8px;">只看匹配：</label>
+                        <input type="checkbox" id="discoveryBatchMatchedOnly" checked onchange="discoveryApplyFilter()" style="cursor:pointer;">
+                    </span>
                     <button class="btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="discoveryApplyFilter()">应用筛选</button>
                     <button class="btn-secondary" style="padding:4px 12px;font-size:12px;" onclick="discoveryClearFilter()">清空</button>
                     <span style="font-size:12px;color:#94a3b8;margin-left:4px;">筛选只影响本地显示，Apify 已按抓取帖子数收费</span>
@@ -2003,6 +2017,7 @@
                     <div id="discoveryCount" style="font-size:13px;color:#64748b;">已选 0 个</div>
                     <div style="display:flex;gap:8px;">
                         <button class="btn-secondary" onclick="discoveryClearResults()">清空结果</button>
+                        <button class="btn-secondary" onclick="discoveryExportCsv()" id="discoveryExportCsvBtn" style="display:none;">导出 CSV</button>
                         <button class="btn-primary" onclick="discoveryAddSelectedToOutreach()">加入红人库</button>
                     </div>
                 </div>
@@ -8791,14 +8806,30 @@ function discoveryOnSearchTypeChange() {
     var kw = document.getElementById('discoveryKeyword');
     var similarOpts = document.getElementById('discoverySimilarOptions');
     var similarHint = document.getElementById('discoverySimilarHint');
+    var batchOpts = document.getElementById('discoveryBatchOptions');
+    var batchMatchedFilter = document.getElementById('discoveryBatchMatchedFilter');
+    var exportBtn = document.getElementById('discoveryExportCsvBtn');
     if (type === 'similar') {
         if (kw) kw.placeholder = '输入种子账号，逗号分隔，最多 5 个（如 user1, user2, user3）';
         if (similarOpts) similarOpts.style.display = 'flex';
         if (similarHint) similarHint.style.display = 'inline';
+        if (batchOpts) batchOpts.style.display = 'none';
+        if (batchMatchedFilter) batchMatchedFilter.style.display = 'none';
+        if (exportBtn) exportBtn.style.display = 'none';
+    } else if (type === 'batch') {
+        if (kw) kw.placeholder = '粘贴用户名列表（换行或逗号分隔，每批最多 50 个）';
+        if (similarOpts) similarOpts.style.display = 'none';
+        if (similarHint) similarHint.style.display = 'none';
+        if (batchOpts) batchOpts.style.display = 'flex';
+        if (batchMatchedFilter) batchMatchedFilter.style.display = 'inline-flex';
+        if (exportBtn) exportBtn.style.display = 'inline-block';
     } else {
         if (kw) kw.placeholder = '输入话题标签，如 yoga、fitness（不用加 #）';
         if (similarOpts) similarOpts.style.display = 'none';
         if (similarHint) similarHint.style.display = 'none';
+        if (batchOpts) batchOpts.style.display = 'none';
+        if (batchMatchedFilter) batchMatchedFilter.style.display = 'none';
+        if (exportBtn) exportBtn.style.display = 'none';
     }
     discoveryRenderHeader();
 }
@@ -8835,6 +8866,33 @@ function discoverySearch() {
         searchTimer = setInterval(function() {
             var secs = Math.floor((Date.now() - searchStartTime) / 1000);
             statusEl.innerText = '搜索中... 已等待 ' + secs + ' 秒（预计 5-6 分钟，请勿关闭页面）';
+        }, 1000);
+    } else if (type === 'batch') {
+        var rawUsernames = document.getElementById('discoveryKeyword').value || '';
+        var usernames = rawUsernames.split(/[\n,，]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+        usernames = usernames.map(function(s) {
+            return s.replace(/^https?:\/\//i, '').replace(/^(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/\/+$/, '').trim();
+        }).filter(function(s) { return s.length > 0; });
+        var seenU = {};
+        usernames = usernames.filter(function(s) { var k = s.toLowerCase(); if (seenU[k]) return false; seenU[k] = true; return true; });
+        if (usernames.length === 0) { showToast('请粘贴至少 1 个用户名', 'error'); return; }
+        if (usernames.length > 50) { showToast('一次最多 50 个，请分批', 'error'); return; }
+        var batchBioKeywords = [];
+        var batchBioRaw = (document.getElementById('discoveryBatchBioKeywords').value || '').trim();
+        if (batchBioRaw) {
+            batchBioKeywords = batchBioRaw.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+        }
+        var batchMinFollowers = parseInt(document.getElementById('discoveryBatchMinFollowers').value, 10);
+        if (isNaN(batchMinFollowers) || batchMinFollowers < 0) batchMinFollowers = 5000;
+        var batchOnlyVerified = document.getElementById('discoveryBatchOnlyVerified').checked;
+        body.usernames = usernames;
+        body.bioKeywords = batchBioKeywords;
+        body.minFollowers = batchMinFollowers;
+        body.onlyVerified = batchOnlyVerified;
+        statusEl.innerText = '批量检查中... 已等待 0 秒（最多 50 个，约 1-5 分钟）';
+        searchTimer = setInterval(function() {
+            var secs = Math.floor((Date.now() - searchStartTime) / 1000);
+            statusEl.innerText = '批量检查中... 已等待 ' + secs + ' 秒（最多 50 个，约 1-5 分钟）';
         }, 1000);
     } else {
         if (!keyword) { showToast('请输入话题标签或 URL', 'error'); return; }
@@ -8896,13 +8954,19 @@ function discoveryIsSimilar() {
     return discoveryCurrentType() === 'similar';
 }
 
+function discoveryIsBatch() {
+    return discoveryCurrentType() === 'batch';
+}
+
 // similar 模式用 followers 字段，hashtag/url 模式用 followersCount
 function discoveryFollowers(r) {
     return (r && r.followers != null ? r.followers : r.followersCount) || 0;
 }
 
 function discoveryColCount() {
-    return discoveryIsSimilar() ? 9 : 8;
+    if (discoveryIsSimilar()) return 9;
+    if (discoveryIsBatch()) return 9;
+    return 8;
 }
 
 function discoveryRenderHeader() {
@@ -8919,6 +8983,18 @@ function discoveryRenderHeader() {
             '<th>邮箱</th>' +
             '<th>认证</th>' +
             '<th>来源种子</th>' +
+            '<th style="width:90px;">操作</th>' +
+            '</tr>';
+    } else if (discoveryIsBatch()) {
+        html = '<tr>' +
+            '<th style="width:40px;"><input type="checkbox" id="discoverySelectAll" onclick="discoveryToggleSelectAll()"></th>' +
+            '<th>用户名</th>' +
+            '<th>全名</th>' +
+            '<th>粉丝数</th>' +
+            '<th>简介</th>' +
+            '<th>匹配状态</th>' +
+            '<th>匹配关键词</th>' +
+            '<th>认证</th>' +
             '<th style="width:90px;">操作</th>' +
             '</tr>';
     } else {
@@ -8950,6 +9026,19 @@ function discoveryRenderRow(r) {
             '<td>' + (r.verified ? '✅' : '-') + '</td>' +
             '<td>' + escHTML(r.seed_username || '-') + '</td>' +
             '<td><a href="' + escAttr(profileUrl) + '" target="_blank" class="payment-action-btn">查看</a></td>' +
+            '</tr>';
+    }
+    if (discoveryIsBatch()) {
+        return '<tr>' +
+            '<td><input type="checkbox" class="discovery-row-cb" data-username="' + escAttr(r.username || '') + '"' + checked + ' onchange="discoveryToggleRow(this)"></td>' +
+            '<td><span class="copy-cell">' + escHTML(r.username || '') + '</span></td>' +
+            '<td>' + escHTML(r.fullName || '-') + '</td>' +
+            '<td>' + discoveryFollowers(r).toLocaleString() + '</td>' +
+            '<td style="max-width:260px;white-space:normal;">' + escHTML(r.biography || '-') + '</td>' +
+            '<td>' + (r.matched ? '✅ 匹配' : '❌ 不匹配') + '</td>' +
+            '<td>' + escHTML((r.matchedKeywords || []).join(', ') || '-') + '</td>' +
+            '<td>' + (r.verified ? '✅' : '-') + '</td>' +
+            '<td><a href="https://instagram.com/' + escAttr(r.username || '') + '" target="_blank" class="payment-action-btn">查看</a></td>' +
             '</tr>';
     }
     return '<tr>' +
@@ -9010,6 +9099,11 @@ function discoveryUpdateStatus() {
         statusEl.innerText = 'Apify 返回 ' + (discoveryTotal || 0) + ' 个 → 内部去重后 ' + (discoveryAfterInternalDedup || 0) + ' 个 → 过滤红人库 ' + (discoveryDroppedInLibrary || 0) + ' 个 → 显示 ' + total + ' 个';
         return;
     }
+    if (discoveryIsBatch()) {
+        var matchedCount = discoveryResults.filter(function(r) { return r.matched; }).length;
+        statusEl.innerText = '批量检查 ' + (discoveryTotal || 0) + ' 个 → 匹配 ' + matchedCount + ' 个 → 过滤红人库 ' + (discoveryDroppedInLibrary || 0) + ' 个 → 显示 ' + total + ' 个';
+        return;
+    }
     var prefix = '';
     if (discoveryPostsCount > 0) {
         prefix = '抓了 ' + discoveryPostsCount + ' 条帖子';
@@ -9050,10 +9144,14 @@ function discoveryApplyFilter() {
     var max = parseInt(document.getElementById('discoveryMaxFollowers').value) || Infinity;
     var verifiedOnly = document.getElementById('discoveryVerifiedOnly').checked;
     var creatorOnly = document.getElementById('discoveryCreatorOnly').checked;
+    var isBatch = discoveryIsBatch();
+    var matchedEl = document.getElementById('discoveryBatchMatchedOnly');
+    var matchedOnly = isBatch && matchedEl && matchedEl.checked;
     var list = discoveryResults.filter(function(r) {
         if (discoveryFollowers(r) < min || discoveryFollowers(r) > max) return false;
         if (verifiedOnly && !r.verified) return false;
         if (creatorOnly && r.statistics && Number(r.statistics.account_type) === 2) return false;
+        if (matchedOnly && !r.matched) return false;
         return true;
     });
     list.sort(function(a, b) { return discoveryFollowers(b) - discoveryFollowers(a); });
@@ -9075,6 +9173,8 @@ function discoveryClearFilter() {
     document.getElementById('discoveryMaxFollowers').value = '';
     document.getElementById('discoveryVerifiedOnly').checked = false;
     document.getElementById('discoveryCreatorOnly').checked = true;
+    var batchMatched = document.getElementById('discoveryBatchMatchedOnly');
+    if (batchMatched) batchMatched.checked = true;
     discoveryApplyFilter();
 }
 
@@ -9086,8 +9186,36 @@ function discoveryClearResults() {
     discoveryPostsCount = 0;
     discoveryDerivedCount = 0;
     discoveryHashtagCount = 0;
+    discoveryTotal = 0;
+    discoveryAfterInternalDedup = 0;
     discoveryRenderTable();
     document.getElementById('discoveryStatus').innerText = '';
+}
+
+function discoveryExportCsv() {
+    if (discoveryResults.length === 0) { showToast('没有可导出的结果', 'error'); return; }
+    var headers = ['用户名', '全名', '粉丝数', '帖子数', '简介', '匹配状态', '匹配关键词', '认证', '主页'];
+    var rows = [headers];
+    discoveryResults.forEach(function(r) {
+        rows.push([
+            r.username || '',
+            r.fullName || '',
+            r.followersCount || 0,
+            r.postsCount || 0,
+            r.biography || '',
+            r.matched ? '匹配' : '不匹配',
+            (r.matchedKeywords || []).join('; '),
+            r.verified ? '是' : '否',
+            'https://instagram.com/' + (r.username || '')
+        ]);
+    });
+    var csv = rows.map(function(row) { return row.map(function(cell) { return '"' + String(cell).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'discovery_batch.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
 }
 
 function discoveryAddSelectedToOutreach() {
