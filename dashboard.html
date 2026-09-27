@@ -464,6 +464,29 @@
         .tools-empty {
             grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 14px;
         }
+        .tool-card-add {
+            background: #fff;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: border-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .tool-card-add:hover {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            transform: translateY(-4px);
+            box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+        }
+        .tool-card-add-plus { font-size: 32px; line-height: 1; transition: transform 0.2s ease; }
+        .tool-card-add:hover .tool-card-add-plus { transform: scale(1.2); }
+        .tool-card-add-text { font-size: 14px; font-weight: 600; }
         @media (max-width: 1100px) { .tools-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 640px) { .tools-grid { grid-template-columns: 1fr; } }
         /* Outreach 操作按钮组 —— .outreach-toolbar 里的左侧一组
@@ -2117,9 +2140,6 @@
 
         <div id="page-tools" class="page-content">
             <h2 class="page-title">Tools - 工具箱</h2>
-            <div style="margin-bottom:16px;">
-                <button class="btn-primary" onclick="showAddToolModal()">➕ 添加工具</button>
-            </div>
             <div class="tools-grid" id="toolsGrid"></div>
         </div>
 
@@ -5404,10 +5424,6 @@
     function renderTools() {
         var grid = document.getElementById('toolsGrid');
         if (!grid) return;
-        if (toolsList.length === 0) {
-            grid.innerHTML = '<div class="tools-empty">暂无工具，点击「添加工具」新增</div>';
-            return;
-        }
         var html = '';
         toolsList.forEach(function(t, idx) {
             var url = t && t.url ? String(t.url) : '#';
@@ -5427,6 +5443,10 @@
                 '<div class="tool-card-desc">' + desc + '</div>' +
                 '</div>';
         });
+        html += '<div class="tool-card-add" data-action="add">' +
+            '<div class="tool-card-add-plus">➕</div>' +
+            '<div class="tool-card-add-text">添加工具</div>' +
+            '</div>';
         grid.innerHTML = html;
     }
 
@@ -5481,6 +5501,10 @@
         var del = e.target.closest('.tool-delete');
         if (del) {
             deleteTool(parseInt(del.getAttribute('data-idx'), 10));
+            return;
+        }
+        if (e.target.closest('.tool-card-add')) {
+            showAddToolModal();
             return;
         }
         var card = e.target.closest('.tool-card');
