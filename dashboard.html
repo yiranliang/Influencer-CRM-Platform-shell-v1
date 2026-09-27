@@ -417,6 +417,39 @@
             margin-bottom: 20px;
             margin-top: 0;
         }
+        /* Tools 工具箱卡片 */
+        .tools-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+        .tool-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            min-height: 140px;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .tool-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(0,0,0,0.12); }
+        .tool-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+        .tool-card-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; flex-shrink: 0;
+        }
+        .tool-card-arrow { color: #cbd5e1; font-size: 22px; line-height: 1; font-weight: 600; }
+        .tool-card-name { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 6px; }
+        .tool-card-desc {
+            font-size: 13px; color: #94a3b8; line-height: 1.5;
+            display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
+        .tools-empty {
+            grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: #94a3b8; font-size: 14px;
+        }
+        @media (max-width: 1100px) { .tools-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 640px) { .tools-grid { grid-template-columns: 1fr; } }
         /* Outreach 操作按钮组 —— .outreach-toolbar 里的左侧一组
            （原来挤在 .outreach-toolbar .toolbar-right 里，hover 样式也跟着选择器一起失效，
            所以 .btn-secondary:hover 必须在这里补回来） */
@@ -1420,6 +1453,10 @@
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                 Discovery
             </div>
+            <div class="nav-item" data-page="tools">
+                <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>
+                Tools
+            </div>
             <div class="nav-item" data-page="settings">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                 Settings
@@ -2060,6 +2097,11 @@
                     <span id="emailConfigStatus" style="margin-left:12px;font-size:13px;color:#94a3b8;"></span>
                 </div>
             </div>
+        </div>
+
+        <div id="page-tools" class="page-content">
+            <h2 class="page-title">Tools - 工具箱</h2>
+            <div class="tools-grid" id="toolsGrid"></div>
         </div>
 
     </div>
@@ -5307,6 +5349,40 @@
         });
     }
 
+    function loadTools() {
+        var grid = document.getElementById('toolsGrid');
+        if (!grid) return;
+        fetch('/tools_config.json')
+            .then(function(resp) { return resp.json(); })
+            .then(function(tools) {
+                tools = Array.isArray(tools) ? tools : [];
+                if (tools.length === 0) {
+                    grid.innerHTML = '<div class="tools-empty">暂无工具，请在 tools_config.json 中添加</div>';
+                    return;
+                }
+                var html = '';
+                tools.forEach(function(t) {
+                    var url = t && t.url ? String(t.url) : '#';
+                    var name = escHTML((t && t.name) || '');
+                    var desc = escHTML((t && t.desc) || '');
+                    var icon = escHTML((t && t.icon) || '🔗');
+                    var color = (t && t.color) ? String(t.color) : '#4f46e5';
+                    html += '<a class="tool-card" href="' + escAttr(url) + '" target="_blank" rel="noopener noreferrer">' +
+                        '<div class="tool-card-top">' +
+                            '<div class="tool-card-icon" style="background:' + escAttr(color) + ';">' + icon + '</div>' +
+                            '<span class="tool-card-arrow">›</span>' +
+                        '</div>' +
+                        '<div class="tool-card-name">' + name + '</div>' +
+                        '<div class="tool-card-desc">' + desc + '</div>' +
+                        '</a>';
+                });
+                grid.innerHTML = html;
+            })
+            .catch(function() {
+                grid.innerHTML = '<div class="tools-empty">暂无工具，请在 tools_config.json 中添加</div>';
+            });
+    }
+
     var navItems = document.querySelectorAll('.nav-item');
     var pages = document.querySelectorAll('.page-content');
     navItems.forEach(function(item) {
@@ -5324,11 +5400,16 @@
             if (pageName === 'settings') {
                 loadEmailConfig();
             }
+            // 切换到 Tools 时刷新工具箱
+            if (pageName === 'tools') {
+                loadTools();
+            }
         });
     });
 
     loadInfluencers();
     loadEmailConfig();
+    loadTools();
     refreshAnalytics();
     setInterval(checkAutoStatusUpdate, 24 * 60 * 60 * 1000);
 

@@ -159,6 +159,12 @@ function createServer() {
     return;
   }
 
+  // Serve tools_config.json（Tools 工具箱配置）
+  if (pathname === '/tools_config.json' && req.method === 'GET') {
+    serveStatic(res, path.join(__dirname, 'tools_config.json'));
+    return;
+  }
+
   // POST /api/send-emails
   if (pathname === '/api/send-emails' && req.method === 'POST') {
     parseBody(req).then(async (body) => {
