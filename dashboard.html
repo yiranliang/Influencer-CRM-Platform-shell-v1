@@ -2109,8 +2109,8 @@
                     </div>
                     <button class="btn-primary" id="discoverySearchBtn" onclick="discoverySearch()">搜索</button>
                     <button class="btn-secondary" id="discoveryImportCsvBtn" onclick="discoveryImportCsv()" style="display:none;">📁 导入 CSV</button>
-                    <button class="btn-secondary" id="discoveryStopBtn" onclick="discoveryBatchStop = true" style="display:none;">停止</button>
-                    <span id="discoverySimilarHint" style="display:none;font-size:12px;color:#f97316;white-space:nowrap;">预计 5-6 分钟，请勿关闭页面</span>
+                    <button class="btn-secondary" id="discoveryStopBtn" onclick="discoveryStop()" style="display:none;">停止</button>
+                    <span id="discoverySimilarHint" style="display:none;font-size:12px;color:#f97316;white-space:nowrap;">异步执行，完成后自动出结果（最长 1 小时）</span>
                 </div>
 
                 <div id="discoveryExtraHashtagsWrap" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
@@ -9308,6 +9308,23 @@ var discoveryHashtagCount = 0;
 var discoveryTotal = 0;
 var discoveryAfterInternalDedup = 0;
 var discoveryBatchStop = false;
+var discoveryPollTimer = null;   // 相似发现轮询定时器
+var discoveryPollStop = false;   // 相似发现「停止」标志
+
+// 停止按钮：同时取消批量检查 + 相似发现轮询（任务在 Apify 继续，只是前端不再等待）
+function discoveryStop() {
+    discoveryBatchStop = true;
+    discoveryPollStop = true;
+}
+
+// 相似发现清理：清轮询定时器、恢复搜索按钮、隐藏停止按钮
+function discoverySimilarCleanup() {
+    if (discoveryPollTimer) { clearInterval(discoveryPollTimer); discoveryPollTimer = null; }
+    var btn = document.getElementById('discoverySearchBtn');
+    var stopBtn = document.getElementById('discoveryStopBtn');
+    if (btn) btn.disabled = false;
+    if (stopBtn) stopBtn.style.display = 'none';
+}
 
 function loadApifyUsage() {
     var el = document.getElementById('apifyUsage');
@@ -9329,7 +9346,7 @@ function loadApifyUsage() {
 var discoveryHints = {
     hashtag: '搜索会消耗 Apify 额度。结果先进「待审核」，你手动挑再入库。<br>话题标签模式会抓取帖子再反推创作者，消耗更多额度（约 $0.2-0.5/次），也比关键词搜索慢。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：广撒网、找新人、没有种子账号时用。</span>',
     url: '输入 Instagram 主页 URL，直接抓取该账号的资料（粉丝数、简介、认证）。<br>每次约 $0.003/账号，速度快。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：已知具体账号，想快速拉资料、验证信息。</span>',
-    similar: '输入种子账号，Apify 帮你找 Instagram 推荐的相关账号。<br>每次约 $0.2-0.4，耗时 5-6 分钟，请耐心等待。<br>结果精准度高，适合找同领域、同风格的人。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：已有优质种子（大网红），想找同款、深挖同一圈层。</span>',
+    similar: '输入种子账号，Apify 帮你找 Instagram 推荐的相关账号。<br>每次约 $0.2-0.4，异步执行（通常几分钟，最长 1 小时），完成后自动出结果。<br>结果精准度高，适合找同领域、同风格的人。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：已有优质种子（大网红），想找同款、深挖同一圈层。</span>',
     batch: '上传/粘贴用户名列表（每批最多 50 个），批量拉取资料。<br>自动按关键词匹配简介，筛选符合条件的红人。<br>每个账号约 $0.003，一次 50 个约 $0.13。<br><span style="color:#7c3aed;font-weight:600;">💡 适合：已有名单，想批量筛简介是否相关（如含 amazon / lifestyle）。</span>'
 };
 
@@ -9353,6 +9370,8 @@ function discoveryOnSearchTypeChange() {
     var limitWrap = document.getElementById('discoveryHashtagLimitWrap');
     var extraWrap = document.getElementById('discoveryExtraHashtagsWrap');
     discoveryBatchStop = true; // 切换类型时取消正在跑的批量任务
+    discoveryPollStop = true;  // 取消相似发现轮询
+    discoverySimilarCleanup(); // 清定时器、恢复按钮
     if (type === 'similar') {
         if (kw) kw.placeholder = '输入种子账号，逗号分隔，最多 5 个（如 user1, user2, user3）';
         if (similarOpts) similarOpts.style.display = 'flex';
@@ -9396,7 +9415,6 @@ function discoverySearch() {
     var btn = document.getElementById('discoverySearchBtn');
     var statusEl = document.getElementById('discoveryStatus');
     var body = { searchType: type };
-    var searchStartTime = Date.now();
     var searchTimer = null;
 
     if (type === 'similar') {
@@ -9414,15 +9432,8 @@ function discoverySearch() {
         if (isNaN(minFollowers) || minFollowers < 0) minFollowers = 5000;
         var maxProfiles = parseInt(document.getElementById('discoverySimilarMaxProfiles').value, 10);
         if (isNaN(maxProfiles) || maxProfiles < 1) maxProfiles = 200;
-        body.seeds = seeds;
-        body.bioKeywords = bioKeywords;
-        body.minFollowers = minFollowers;
-        body.maxProfiles = maxProfiles;
-        statusEl.innerText = '搜索中... 已等待 0 秒（预计 5-6 分钟，请勿关闭页面）';
-        searchTimer = setInterval(function() {
-            var secs = Math.floor((Date.now() - searchStartTime) / 1000);
-            statusEl.innerText = '搜索中... 已等待 ' + secs + ' 秒（预计 5-6 分钟，请勿关闭页面）';
-        }, 1000);
+        discoverySimilarRun(seeds, bioKeywords, minFollowers, maxProfiles);
+        return;
     } else if (type === 'batch') {
         var rawUsernames = document.getElementById('discoveryKeyword').value || '';
         var usernames = rawUsernames.split(/[\n,，]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
@@ -9490,6 +9501,130 @@ function discoverySearch() {
         statusEl.innerText = '搜索失败';
         console.error(err);
         showToast('请求失败：' + err.message, 'error');
+    });
+}
+
+// 相似发现：异步提交 + 每 10 秒轮询状态，完成后拉结果（不限时，最长 1 小时；支持中途停止）
+function discoverySimilarRun(seeds, bioKeywords, minFollowers, maxProfiles) {
+    var btn = document.getElementById('discoverySearchBtn');
+    var stopBtn = document.getElementById('discoveryStopBtn');
+    var statusEl = document.getElementById('discoveryStatus');
+    if (discoveryPollTimer) { clearInterval(discoveryPollTimer); discoveryPollTimer = null; }
+    discoveryPollStop = false;
+    if (btn) btn.disabled = true;
+    if (stopBtn) stopBtn.style.display = 'inline-block';
+
+    var startTime = Date.now();
+    var MAX_WAIT_MS = 60 * 60 * 1000; // 最长 1 小时
+    var runId = '';
+    var datasetId = '';
+
+    function elapsedText() {
+        var total = Math.floor((Date.now() - startTime) / 1000);
+        if (total >= 60) {
+            var m = Math.floor(total / 60);
+            var s = total % 60;
+            return m + ' 分 ' + s + ' 秒';
+        }
+        return total + ' 秒';
+    }
+
+    function render(data) {
+        discoveryResults = Array.isArray(data.data) ? data.data : [];
+        discoveryResults.sort(function(a, b) { return discoveryFollowers(b) - discoveryFollowers(a); });
+        discoverySelected.clear();
+        discoveryDropped = data.dropped || 0;
+        discoveryDroppedInLibrary = data.droppedInLibrary || 0;
+        discoveryPostsCount = data.postsCount || 0;
+        discoveryDerivedCount = data.derivedCount || 0;
+        discoveryHashtagCount = data.hashtagCount || 0;
+        discoveryTotal = data.total || 0;
+        discoveryAfterInternalDedup = data.afterInternalDedup || 0;
+        discoveryApplyFilter();
+        loadApifyUsage();
+    }
+
+    function fail(msg) {
+        discoverySimilarCleanup();
+        statusEl.innerText = '搜索失败';
+        showToast(msg || '搜索失败', 'error');
+    }
+
+    function checkOnce() {
+        if (discoveryPollStop) {
+            discoverySimilarCleanup();
+            statusEl.innerText = '已停止（任务仍在 Apify 运行，可到 Apify Console 查看）';
+            return;
+        }
+        if (Date.now() - startTime > MAX_WAIT_MS) {
+            fail('等待超过 1 小时仍未出结果，请到 Apify Console 查看任务 ' + runId);
+            return;
+        }
+        statusEl.innerHTML = '搜索中... 已等待 ' + elapsedText() + '（任务：' + runId +
+            ' · <a href="https://console.apify.com/actors/runs/' + encodeURIComponent(runId) + '" target="_blank" rel="noopener" style="color:#7c3aed;text-decoration:underline;">Apify Console 查看</a>）';
+        fetch('/api/discovery-check-run?runId=' + encodeURIComponent(runId))
+            .then(function(resp) { return resp.json(); })
+            .then(function(d) {
+                if (discoveryPollStop) return;
+                if (d && d.status === 'SUCCEEDED') {
+                    statusEl.innerText = '任务完成，正在拉取结果...';
+                    fetch('/api/discovery-get-results?runId=' + encodeURIComponent(runId) + '&datasetId=' + encodeURIComponent(datasetId))
+                        .then(function(resp) { return resp.json(); })
+                        .then(function(r) {
+                            if (discoveryPollStop) return;
+                            discoverySimilarCleanup();
+                            if (r && r.success) {
+                                render(r);
+                                statusEl.innerText = '相似发现完成：共 ' + (Array.isArray(r.data) ? r.data.length : 0) + ' 个新账号';
+                            } else {
+                                fail((r && r.error) || '拉取结果失败');
+                            }
+                        })
+                        .catch(function(err) {
+                            if (discoveryPollStop) return;
+                            discoverySimilarCleanup();
+                            statusEl.innerText = '搜索失败';
+                            showToast('拉取结果失败：' + err.message, 'error');
+                        });
+                } else if (d && (d.status === 'FAILED' || d.status === 'ABORTED' || d.status === 'TIMED-OUT')) {
+                    fail('任务 ' + d.status + '，请到 Apify Console 查看详情');
+                } else if (d && d.datasetId) {
+                    datasetId = d.datasetId; // 补充 datasetId（提交响应里可能没有）
+                }
+                // READY / RUNNING 等状态：继续等下一次轮询
+            })
+            .catch(function(err) {
+                // 网络抖动：忽略本次，等下一次轮询重试
+                console.warn('[discovery-similar] 轮询失败（将重试）:', err);
+            });
+    }
+
+    fetch('/api/discovery-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ searchType: 'similar', seeds: seeds, bioKeywords: bioKeywords, minFollowers: minFollowers, maxProfiles: maxProfiles })
+    }).then(function(resp) { return resp.json(); })
+    .then(function(data) {
+        if (!data || !data.success || !data.runId) {
+            discoverySimilarCleanup();
+            statusEl.innerText = '搜索失败';
+            showToast((data && data.error) || '提交任务失败', 'error');
+            return;
+        }
+        runId = data.runId;
+        datasetId = data.datasetId || '';
+        if (discoveryPollStop) {
+            discoverySimilarCleanup();
+            statusEl.innerText = '已停止（任务已在 Apify 提交，可到 Apify Console 查看）';
+            return;
+        }
+        checkOnce();
+        discoveryPollTimer = setInterval(checkOnce, 10000);
+    })
+    .catch(function(err) {
+        discoverySimilarCleanup();
+        statusEl.innerText = '搜索失败';
+        showToast('提交任务失败：' + err.message, 'error');
     });
 }
 

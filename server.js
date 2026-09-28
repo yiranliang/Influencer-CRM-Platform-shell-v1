@@ -102,6 +102,54 @@ function parseBody(req) {
   });
 }
 
+// —— Apify 异步任务辅助（相似发现轮询用）——
+// 统一请求封装：带超时，非 2xx 抛错
+async function apifyRequest(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 60000);
+  try {
+    const resp = await fetch(url, Object.assign({}, options || {}, { signal: controller.signal }));
+    clearTimeout(timer);
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error('Apify HTTP ' + resp.status + (text ? ' ' + text.slice(0, 300) : ''));
+    }
+    return await resp.json();
+  } catch (err) {
+    clearTimeout(timer);
+    if (err && err.name === 'AbortError') throw new Error('Apify 请求超时');
+    throw err;
+  }
+}
+
+// 异步提交任务：POST /v2/acts/{actorId}/runs → 返回 { runId, datasetId }
+async function submitApifyRun(actorId, apifyBody, label) {
+  const url = 'https://api.apify.com/v2/acts/' + actorId + '/runs?token=' + encodeURIComponent(APIFY_TOKEN);
+  console.log('[discovery] %s 提交任务 body: %s', label, JSON.stringify(apifyBody));
+  const data = await apifyRequest(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(apifyBody) }, 60000);
+  const d = (data && data.data) || {};
+  const runId = d.id || '';
+  const datasetId = d.defaultDatasetId || '';
+  if (!runId) throw new Error('Apify 未返回 runId');
+  console.log('[discovery] %s 任务已提交 runId=%s datasetId=%s', label, runId, datasetId);
+  return { runId, datasetId };
+}
+
+// 查询任务状态：GET /v2/actor-runs/{runId} → 返回 { status, datasetId }
+async function checkApifyRun(runId) {
+  const url = 'https://api.apify.com/v2/actor-runs/' + encodeURIComponent(runId) + '?token=' + encodeURIComponent(APIFY_TOKEN);
+  const data = await apifyRequest(url, { method: 'GET' }, 30000);
+  const d = (data && data.data) || {};
+  return { status: d.status || '', datasetId: d.defaultDatasetId || '' };
+}
+
+// 拉取数据集结果：GET /v2/datasets/{datasetId}/items → 返回数组
+async function getApifyDatasetItems(datasetId) {
+  const url = 'https://api.apify.com/v2/datasets/' + encodeURIComponent(datasetId) + '/items?token=' + encodeURIComponent(APIFY_TOKEN);
+  const data = await apifyRequest(url, { method: 'GET' }, 120000);
+  return Array.isArray(data) ? data : [];
+}
+
 function createServer() {
   return http.createServer((req, res) => {
     const url = new URL(req.url, 'http://localhost');
@@ -509,7 +557,7 @@ function createServer() {
           // URL 精确抓取：直接抓账号详情
           profiles = await callApify(APIFY_DETAILS_ACTOR, { directUrls: [keyword], resultsType: 'details', addProfileStatistics: true }, 'URL抓取');
         } else if (searchType === 'similar') {
-          // 相似红人发现：用种子账号抓 Instagram 相关推荐账号（10 分钟超时）
+          // 相似红人发现：异步提交任务，立即返回 runId；前端每 10 秒轮询状态，出结果后拉取（避开同步接口 300 秒硬限制）
           const bioKeywords = (Array.isArray(body.bioKeywords) ? body.bioKeywords : []).map(function (k) { return String(k || '').trim(); }).filter(function (k) { return k.length > 0; });
           if (bioKeywords.length === 0) bioKeywords.push('amazon'); // 默认简介关键词
           let minFollowers = parseInt(body.minFollowers, 10);
@@ -524,27 +572,9 @@ function createServer() {
             bioKeywords: bioKeywords,
             enrichProfiles: true
           };
-          profiles = await callApify(APIFY_SIMILAR_ACTOR, similarBody, '相似发现', 600000);
-          // 相似发现两层去重：1) 本次内部按 username 去重；2) 过滤掉已在红人库的账号
-          similarRawCount = profiles.length;
-          const seen = new Set();
-          const deduped = [];
-          profiles.forEach(function (it) {
-            if (!it || !it.username) return;
-            const uname = String(it.username).toLowerCase();
-            if (seen.has(uname)) return;
-            seen.add(uname);
-            deduped.push(it);
-          });
-          afterInternalDedup = deduped.length;
-          const freshSimilar = [];
-          let droppedLib = 0;
-          deduped.forEach(function (it) {
-            if (influencerNames.has(String(it.username).toLowerCase())) { droppedLib++; return; }
-            freshSimilar.push(it);
-          });
-          profiles = freshSimilar;
-          droppedInLibrary = droppedLib;
+          const run = await submitApifyRun(APIFY_SIMILAR_ACTOR, similarBody, '相似发现');
+          sendJSON(res, 200, { success: true, runId: run.runId, datasetId: run.datasetId });
+          return;
         } else if (searchType === 'batch') {
           // 批量检查名单：用 Instagram Profile Scraper 一次抓最多 50 个账号的资料
           const bioKeywords = (Array.isArray(body.bioKeywords) ? body.bioKeywords : []).map(function (k) { return String(k || '').trim(); }).filter(function (k) { return k.length > 0; });
@@ -692,6 +722,72 @@ function createServer() {
         sendJSON(res, 500, { success: false, error: err.message || '请求失败' });
       }
     }).catch(err => sendJSON(res, 400, { error: err.message }));
+    return;
+  }
+
+  // GET /api/discovery-check-run — 轮询相似发现任务状态（前端每 10 秒查一次）
+  if (pathname === '/api/discovery-check-run' && req.method === 'GET') {
+    const runId = (url.searchParams.get('runId') || '').trim();
+    if (!runId) { sendJSON(res, 400, { success: false, error: '缺少 runId' }); return; }
+    if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token' }); return; }
+    checkApifyRun(runId).then(function (r) {
+      sendJSON(res, 200, { success: true, status: r.status, datasetId: r.datasetId });
+    }).catch(function (err) {
+      console.error('[discovery-check-run] 错误:', err.message);
+      sendJSON(res, 500, { success: false, error: err.message || '查询失败' });
+    });
+    return;
+  }
+
+  // GET /api/discovery-get-results — 拉取相似发现结果（内部去重 + 过滤红人库已有账号）
+  if (pathname === '/api/discovery-get-results' && req.method === 'GET') {
+    const runId = (url.searchParams.get('runId') || '').trim();
+    const datasetId = (url.searchParams.get('datasetId') || '').trim();
+    if (!runId && !datasetId) { sendJSON(res, 400, { success: false, error: '缺少 runId 或 datasetId' }); return; }
+    if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token' }); return; }
+    (async function () {
+      let dsId = datasetId;
+      if (!dsId) {
+        const r = await checkApifyRun(runId);
+        dsId = r.datasetId || '';
+      }
+      if (!dsId) throw new Error('未获取到 datasetId');
+      const items = await getApifyDatasetItems(dsId);
+      const similarRawCount = items.length;
+      const influencerNames = loadInfluencerNames();
+      const seen = new Set();
+      const deduped = [];
+      items.forEach(function (it) {
+        if (!it || !it.username) return;
+        const uname = String(it.username).toLowerCase();
+        if (seen.has(uname)) return;
+        seen.add(uname);
+        deduped.push(it);
+      });
+      const afterInternalDedup = deduped.length;
+      const fresh = [];
+      let droppedInLibrary = 0;
+      deduped.forEach(function (it) {
+        if (influencerNames.has(String(it.username).toLowerCase())) { droppedInLibrary++; return; }
+        fresh.push(it);
+      });
+      console.log('[discovery-get-results] 原始 %d 条 → 内部去重 %d → 过滤红人库 %d → 最终 %d', similarRawCount, afterInternalDedup, droppedInLibrary, fresh.length);
+      sendJSON(res, 200, {
+        success: true,
+        data: fresh,
+        total: similarRawCount,
+        afterInternalDedup: afterInternalDedup,
+        newCount: fresh.length,
+        dropped: droppedInLibrary,
+        droppedInLibrary: droppedInLibrary,
+        postsCount: 0,
+        derivedCount: 0,
+        hashtagCount: 0
+      });
+    })().catch(function (err) {
+      console.error('[discovery-get-results] 错误:', err.message);
+      sendJSON(res, 500, { success: false, error: err.message || '拉取失败' });
+    });
     return;
   }
 
