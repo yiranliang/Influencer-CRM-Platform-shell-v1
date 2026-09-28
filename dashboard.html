@@ -1843,6 +1843,7 @@
             <!-- 红人主页检查卡片 -->
             <div class="table-card">
                 <h3>🔍 红人主页检查</h3>
+                <div id="homepageApifyUsage" style="font-size:12px;color:#64748b;margin-bottom:8px;">Apify 额度：加载中…</div>
                 <div class="toolbar pipeline-toolbar">
                     <div class="toolbar-left">
                         <span style="font-size:13px;color:#475569;">已勾选 <strong id="homepageSelectedCount" style="color:#4f46e5;">0</strong> 个红人（在寄样列表中勾选）</span>
@@ -5287,6 +5288,7 @@
             homepageCheckData = arr;
             homepageCheckPage = 1;
             renderHomepageCheckTable();
+            loadApifyUsage();
 
             if (stopped) {
                 statusEl.innerText = '已停止，显示已完成的 ' + allResults.length + ' 个红人';
@@ -9578,21 +9580,31 @@ function discoverySimilarCleanup() {
     if (stopBtn) stopBtn.style.display = 'none';
 }
 
+function renderApifyUsage(el, d) {
+    if (!el) return;
+    if (!d || !d.success) { el.innerText = 'Apify 额度：—'; el.style.color = '#94a3b8'; return; }
+    var used = (d.used || 0).toFixed(2);
+    var limit = (d.limit || 0).toFixed(2);
+    var remaining = (d.remaining || 0).toFixed(2);
+    el.innerText = 'Apify 额度：已用 $' + used + ' / $' + limit + '（剩余 $' + remaining + '）';
+    if (d.cycleEnd) el.title = '周期结束：' + String(d.cycleEnd).slice(0, 10);
+    el.style.color = (d.remaining < 1) ? '#f97316' : '#64748b';
+}
+
 function loadApifyUsage() {
     var el = document.getElementById('apifyUsage');
-    if (!el) return;
+    var homeEl = document.getElementById('homepageApifyUsage');
+    if (!el && !homeEl) return;
     fetch('/api/apify-usage')
         .then(function(resp) { return resp.json(); })
         .then(function(d) {
-            if (!d || !d.success) { el.innerText = 'Apify 额度：—'; el.style.color = '#94a3b8'; return; }
-            var used = (d.used || 0).toFixed(2);
-            var limit = (d.limit || 0).toFixed(2);
-            var remaining = (d.remaining || 0).toFixed(2);
-            el.innerText = 'Apify 额度：已用 $' + used + ' / $' + limit + '（剩余 $' + remaining + '）';
-            if (d.cycleEnd) el.title = '周期结束：' + String(d.cycleEnd).slice(0, 10);
-            el.style.color = (d.remaining < 1) ? '#f97316' : '#64748b';
+            renderApifyUsage(el, d);
+            renderApifyUsage(homeEl, d);
         })
-        .catch(function() { el.innerText = 'Apify 额度：查询失败'; el.style.color = '#94a3b8'; });
+        .catch(function() {
+            if (el) { el.innerText = 'Apify 额度：查询失败'; el.style.color = '#94a3b8'; }
+            if (homeEl) { homeEl.innerText = 'Apify 额度：查询失败'; homeEl.style.color = '#94a3b8'; }
+        });
 }
 
 var discoveryHints = {
