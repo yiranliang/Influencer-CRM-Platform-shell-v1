@@ -1042,6 +1042,36 @@
             border-bottom: 1px solid #e9eef3;
         }
 
+        /* 红人主页检查表格（独立列宽，避免与寄样列表的 nth-child 规则冲突） */
+        .homepage-check-table { width: 100%; min-width: 560px; table-layout: fixed; border-collapse: collapse; }
+        .homepage-check-table thead { position: sticky; top: 0; z-index: 5; }
+        .homepage-check-table thead th { background: #f8fafc; border-bottom: 2px solid #e9eef3; padding: 10px 8px; font-size: 13px; font-weight: 600; text-align: left; }
+        .homepage-check-table tbody td { padding: 8px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
+        .homepage-check-table th:nth-child(1), .homepage-check-table td:nth-child(1) { width: 36px; text-align: center; }
+        .homepage-check-table th:nth-child(2), .homepage-check-table td:nth-child(2) { width: 170px; }
+        .homepage-check-table th:nth-child(3), .homepage-check-table td:nth-child(3) { width: 120px; }
+        .homepage-check-table th:nth-child(4), .homepage-check-table td:nth-child(4) { width: 100px; }
+        .homepage-check-table th:nth-child(5), .homepage-check-table td:nth-child(5) { width: 90px; text-align: right; }
+        .homepage-check-table .status-badge { font-size: 11px; padding: 2px 8px; }
+
+        /* 红人主页检查 展开按钮 */
+        .homepage-expand-btn { background: none; border: none; cursor: pointer; font-size: 16px; color: #94a3b8; padding: 4px 6px; line-height: 1; transition: all 0.2s; border-radius: 4px; }
+        .homepage-expand-btn:hover { color: #4f46e5; background: #f1f5f9; }
+
+        /* 红人主页检查 展开详情行（帖子列表） */
+        .homepage-detail-row td { background: #f8fafc; padding: 0 16px 16px 16px; }
+        .homepage-detail-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .homepage-detail-table th { background: #f1f5f9; padding: 6px 8px; text-align: left; font-weight: 500; border-bottom: 1px solid #e2e8f0; }
+        .homepage-detail-table td { padding: 6px 8px; border-bottom: 1px solid #e9eef3; vertical-align: top; }
+        .homepage-detail-table th:nth-child(1) { width: 120px; }
+        .homepage-detail-table th:nth-child(3) { width: 180px; }
+
+        /* 文案截断 + tooltip（深色背景、白字、圆角） */
+        .homepage-caption { position: relative; cursor: help; display: inline-block; max-width: 100%; vertical-align: middle; }
+        .homepage-caption::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 0; background: #1e293b; color: white; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 400; white-space: pre-wrap; max-width: 360px; line-height: 1.5; opacity: 0; visibility: hidden; transition: all 0.2s ease; z-index: 999999; box-shadow: 0 4px 16px rgba(0,0,0,0.2); pointer-events: none; word-break: break-word; }
+        .homepage-caption::before { content: ''; position: absolute; bottom: calc(100% + 2px); left: 16px; border: 6px solid transparent; border-top-color: #1e293b; opacity: 0; visibility: hidden; transition: all 0.2s ease; z-index: 999999; pointer-events: none; }
+        .homepage-caption:hover::after, .homepage-caption:hover::before { opacity: 1; visibility: visible; }
+
         /* Overview 页面布局 */
         .overview-stats-grid {
             display: flex;
@@ -1872,8 +1902,8 @@
                 </div>
                 <div id="homepageCheckStatus" style="font-size:13px;color:#64748b;margin:6px 0;"></div>
                 <div class="pipeline-table-container">
-                    <table class="pipeline-table"><thead><tr>
-                        <th>红人ID</th><th>最后发帖时间</th><th>状态</th><th>帖子文案</th><th>帖子标签</th><th>操作</th>
+                    <table class="homepage-check-table"><thead><tr>
+                        <th></th><th>红人ID</th><th>最后发帖时间</th><th>状态</th><th>操作</th>
                     </tr></thead>
                     <tbody id="homepageCheckBody"></tbody></table>
                 </div>
@@ -5096,6 +5126,7 @@
     var homepageCheckPage = 1;
     var homepageCheckPageSize = 20;
     var homepageCheckStop = false;
+    var homepageExpandedUsername = null;
 
     function updateHomepageSelectedCount() {
         var el = document.getElementById('homepageSelectedCount');
@@ -5129,46 +5160,105 @@
         return String(raw).split(',').map(function(w) { return w.trim().toLowerCase(); }).filter(function(w) { return w.length > 0; });
     }
 
-    function homepageCaptionHtml(caption, words) {
-        var text = String(caption || '').replace(/\s+/g, ' ').trim();
-        if (!text) return '<span style="color:#94a3b8;">-</span>';
-        if (text.length > 180) text = text.slice(0, 180) + '…';
-        var esc = escHTML(text);
+    function homepageCaptionCell(caption, words) {
+        var full = String(caption || '').replace(/\s+/g, ' ').trim();
+        if (!full) return '<span style="color:#94a3b8;">-</span>';
+        var truncated = full.length > 100 ? full.slice(0, 100) + '...' : full;
+        var esc = escHTML(truncated);
         if (words && words.length) {
             words.forEach(function(w) {
                 var re = new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
                 esc = esc.replace(re, '<mark>$1</mark>');
             });
         }
-        return esc;
+        if (full.length > 100) {
+            return '<span class="homepage-caption" data-tip="' + escAttr(full) + '">' + esc + '</span>';
+        }
+        return '<span class="homepage-caption">' + esc + '</span>';
     }
 
     function renderHomepageCheckTable() {
         var tbody = document.getElementById('homepageCheckBody');
         if (!tbody) return;
+        homepageExpandedUsername = null;
         var start = (homepageCheckPage - 1) * homepageCheckPageSize;
         var pageData = homepageCheckData.slice(start, start + homepageCheckPageSize);
-        var words = homepageHighlightWords();
         var html = '';
         for (var i = 0; i < pageData.length; i++) {
             var r = pageData[i];
             var username = String(r.username || '');
             var profileUrl = r.profileUrl || ('https://www.instagram.com/' + username + '/');
-            var tags = (Array.isArray(r.hashtags) ? r.hashtags : []).join(' ');
             html += '<tr>' +
+                '<td><button class="homepage-expand-btn" onclick="toggleHomepageDetail(this, \'' + escHTML(username) + '\')" title="展开/收起">▸</button></td>' +
                 '<td><span class="copy-cell">' + escHTML(username) + '</span></td>' +
                 '<td>' + escHTML(r.lastPostDate || '-') + '</td>' +
                 '<td>' + (r.active ? '<span class="status-badge" style="background:#dcfce7;color:#166534;">✅ 活跃</span>' : '<span class="status-badge" style="background:#fef9c3;color:#854d0e;">⚠️ 不活跃</span>') + '</td>' +
-                '<td>' + homepageCaptionHtml(r.caption, words) + '</td>' +
-                '<td>' + escHTML(tags || '-') + '</td>' +
                 '<td><a href="' + escAttr(profileUrl) + '" target="_blank" rel="noopener" style="color:#4f46e5;">查看主页</a></td>' +
                 '</tr>';
         }
         if (pageData.length === 0) {
-            html = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">暂无检查结果</td></tr>';
+            html = '<tr><td colspan="5" style="text-align:center;padding:30px;color:#94a3b8;">暂无检查结果</td></tr>';
         }
         tbody.innerHTML = html;
         updateHomepageCheckPagination();
+    }
+
+    function toggleHomepageDetail(btn, username) {
+        var tbody = document.getElementById('homepageCheckBody');
+        if (!tbody) return;
+
+        // 点击已展开的 → 折叠
+        if (homepageExpandedUsername === username) {
+            var detailRow = document.getElementById('homepage-detail-' + username.replace(/[^a-zA-Z0-9]/g, '_'));
+            if (detailRow) detailRow.remove();
+            btn.textContent = '▸';
+            homepageExpandedUsername = null;
+            return;
+        }
+
+        // 折叠之前展开的行（同一时间只展开一个）
+        if (homepageExpandedUsername) {
+            var prevDetail = document.getElementById('homepage-detail-' + homepageExpandedUsername.replace(/[^a-zA-Z0-9]/g, '_'));
+            if (prevDetail) prevDetail.remove();
+            var prevBtns = tbody.querySelectorAll('.homepage-expand-btn');
+            prevBtns.forEach(function(b) { if (b.textContent === '▾') b.textContent = '▸'; });
+        }
+
+        // 展开当前行
+        var detailHtml = renderHomepageDetail(username);
+        var parentRow = btn.closest('tr');
+        var wrapper = document.createElement('tbody');
+        wrapper.innerHTML = detailHtml;
+        parentRow.insertAdjacentElement('afterend', wrapper.firstChild);
+        btn.textContent = '▾';
+        homepageExpandedUsername = username;
+    }
+
+    function renderHomepageDetail(username) {
+        var r = null;
+        for (var i = 0; i < homepageCheckData.length; i++) {
+            if (homepageCheckData[i].username === username) { r = homepageCheckData[i]; break; }
+        }
+        var detailId = 'homepage-detail-' + username.replace(/[^a-zA-Z0-9]/g, '_');
+        var posts = (r && Array.isArray(r.posts)) ? r.posts : [];
+        if (posts.length === 0) {
+            return '<tr class="homepage-detail-row" id="' + detailId + '"><td colspan="5" style="text-align:center;padding:16px;color:#94a3b8;">暂无帖子</td></tr>';
+        }
+        var words = homepageHighlightWords();
+        var html = '<tr class="homepage-detail-row" id="' + detailId + '"><td colspan="5">' +
+            '<table class="homepage-detail-table"><thead><tr>' +
+            '<th>发帖时间</th><th>文案</th><th>标签</th>' +
+            '</tr></thead><tbody>';
+        posts.forEach(function(p) {
+            var tags = (Array.isArray(p.hashtags) ? p.hashtags : []).join(' ');
+            html += '<tr>' +
+                '<td>' + escHTML(p.date || '-') + '</td>' +
+                '<td>' + homepageCaptionCell(p.caption, words) + '</td>' +
+                '<td>' + escHTML(tags || '-') + '</td>' +
+                '</tr>';
+        });
+        html += '</tbody></table></td></tr>';
+        return html;
     }
 
     function updateHomepageCheckPagination() {

@@ -237,19 +237,30 @@ async function checkHomepageBatch(usernames, daysRange, postsLimit) {
     let caption = '';
     const hashtags = [];
     const tagSet = new Set();
+    const postsList = [];
     list.forEach(function (p) {
       const ts = homeTimestamp(p.timestamp);
-      if (ts > lastTs) { lastTs = ts; caption = p.caption || ''; }
+      // 单个帖子的标签（去重）
+      const pTags = [];
+      const pTagSet = new Set();
       (Array.isArray(p.hashtags) ? p.hashtags : []).forEach(function (t) {
         let tg = String(t).trim();
         if (!tg) return;
         if (tg.charAt(0) !== '#') tg = '#' + tg;
-        if (!tagSet.has(tg.toLowerCase())) { tagSet.add(tg.toLowerCase()); hashtags.push(tg); }
+        if (!pTagSet.has(tg.toLowerCase())) { pTagSet.add(tg.toLowerCase()); pTags.push(tg); }
       });
       (String(p.caption || '').match(/#\w+/g) || []).forEach(function (t) {
-        if (!tagSet.has(t.toLowerCase())) { tagSet.add(t.toLowerCase()); hashtags.push(t); }
+        if (!pTagSet.has(t.toLowerCase())) { pTagSet.add(t.toLowerCase()); pTags.push(t); }
       });
+      // 最新帖子：时间 + 文案
+      if (ts > lastTs) { lastTs = ts; caption = p.caption || ''; }
+      // 汇总到全局标签
+      pTags.forEach(function (tg) {
+        if (!tagSet.has(tg.toLowerCase())) { tagSet.add(tg.toLowerCase()); hashtags.push(tg); }
+      });
+      postsList.push({ timestamp: ts, date: ts ? homeFormatDate(ts) : '', caption: p.caption || '', hashtags: pTags, url: p.url || '' });
     });
+    postsList.sort(function (a, b) { return b.timestamp - a.timestamp; });
     const lastPostDate = lastTs ? homeFormatDate(lastTs) : '';
     const active = lastTs >= sevenDaysAgo && lastTs <= Date.now();
     return {
@@ -259,6 +270,7 @@ async function checkHomepageBatch(usernames, daysRange, postsLimit) {
       active: active,
       caption: caption,
       hashtags: hashtags,
+      posts: postsList,
       profileUrl: 'https://www.instagram.com/' + u + '/',
       checkedAt: new Date().toISOString()
     };
