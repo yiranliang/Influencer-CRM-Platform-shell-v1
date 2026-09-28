@@ -207,7 +207,7 @@ class GmailAutomation extends EventEmitter {
 
   // ─── 单封邮件 ────────────────────────────────────
 
-  async sendSingleEmail(email, name, templateName, subject, scheduleTime) {
+  async sendSingleEmail(email, name, templateName, subject, scheduleTime, firstName) {
     // 整个发送流程的总超时保护（2 分钟），防止任一环节卡住导致无限等待
     const TIMEOUT_MS = 120000;
     let timer;
@@ -220,13 +220,13 @@ class GmailAutomation extends EventEmitter {
         fn(val);
       };
       timer = setTimeout(() => done(reject, new Error('发送流程超时（2 分钟），已中止')), TIMEOUT_MS);
-      this._sendSingleEmailCore(email, name, templateName, subject, scheduleTime)
+      this._sendSingleEmailCore(email, name, templateName, subject, scheduleTime, firstName)
         .then((r) => done(resolve, r))
         .catch((err) => done(reject, err));
     });
   }
 
-  async _sendSingleEmailCore(email, name, templateName, subject, scheduleTime) {
+  async _sendSingleEmailCore(email, name, templateName, subject, scheduleTime, firstName) {
     this._log(`开始发送邮件: ${email} | 模板: ${templateName}`);
 
     // 解析定时发送时间（格式: "HH:MM"），覆盖实例级默认值
@@ -271,6 +271,9 @@ class GmailAutomation extends EventEmitter {
     this._log('步骤 5/8: 处理插入文件弹窗...');
     await this._handleInsertFilesDialog();
     await this._sleep(500);
+
+    // 5.5 替换正文占位符 {{firstName}} → 真实名字（模板已插入正文，发送前替换）
+    await this._fillRecipientName(firstName);
 
     // 6. 修改主题（subject 已是最终标题，含替换后的红人姓名）
     this._log('步骤 6/8: 修改主题...');
@@ -322,9 +325,11 @@ class GmailAutomation extends EventEmitter {
 
   // ─── 复邀（回复已有邮件线程）──────────────────────
 
-  async reinviteSingleEmail(email, templateName, scheduleTime) {
-    // 整个复邀流程的总超时保护（2 分钟），与 sendSingleEmail 一致
-    const TIMEOUT_MS = 120000;
+  async reinviteSingleEmail(email, templateName, scheduleTime, firstName) {
+    // 整个复邀流程的总超时保护。★必须大于内部 _waitForSendComplete 的 120s 等待窗口，
+    // 否则外层超时先触发 → server 端 finally 里 cleanup() 把浏览器关了 → 内层还在轮询
+    // 的 _waitForSendComplete 会报 "browser has been closed"。定 5 分钟留足余量。
+    const TIMEOUT_MS = 300000;
     let timer;
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -335,13 +340,13 @@ class GmailAutomation extends EventEmitter {
         fn(val);
       };
       timer = setTimeout(() => done(reject, new Error('复邀流程超时（2 分钟），已中止')), TIMEOUT_MS);
-      this._reinviteSingleEmailCore(email, templateName, scheduleTime)
+      this._reinviteSingleEmailCore(email, templateName, scheduleTime, firstName)
         .then((r) => done(resolve, r))
         .catch((err) => done(reject, err));
     });
   }
 
-  async _reinviteSingleEmailCore(email, templateName, scheduleTime) {
+  async _reinviteSingleEmailCore(email, templateName, scheduleTime, firstName) {
     this._log(`开始复邀: ${email} | 模板: ${templateName}`);
 
     if (scheduleTime) {
@@ -353,26 +358,65 @@ class GmailAutomation extends EventEmitter {
     // 0. 清理残留写信窗口
     await this._closeAnyComposeWindow();
 
-    // 1. 搜索邮箱
+    // ── 步骤 1：搜索邮箱 + 打开最新邮件，校验详情页 ──
+    this._log('步骤 1/6: 搜索邮箱并打开最新邮件...');
     await this._searchEmail(email);
-
-    // 2. 打开第一条（最新）邮件
     await this._openFirstEmail();
+    await this._sleep(1000);
+    const detailOpen = await this._isEmailDetailOpen(5000);
+    await this._saveReinviteDebugShot('step1-email-detail');
+    if (!detailOpen) {
+      await this._saveReinviteDebugShot('step1-FAIL');
+      throw new Error('第 1 步失败：搜索后未进入邮件详情页（Reply 按钮 / 正文容器不可见）');
+    }
+    this._log('✅ 第 1 步通过：邮件详情页已打开');
 
-    // 3. 点 Reply
+    // ── 步骤 2：点 Reply，校验内联回复框 ──
+    this._log('步骤 2/6: 点击 Reply...');
     await this._clickReply();
+    await this._sleep(1000);
+    const replyState = await this._readReplyBoxState();
+    await this._saveReinviteDebugShot('step2-reply-box');
+    if (!replyState.hasBox) {
+      await this._saveReinviteDebugShot('step2-FAIL');
+      throw new Error('第 2 步失败：点击 Reply 后未出现内联回复框（正文输入框不可见）');
+    }
+    this._log(`✅ 第 2 步通过：回复框已出现（可编辑=${replyState.editable} 已聚焦=${replyState.focused}）`);
 
-    // 4. 打开模板面板 + 选模板（回复框的 ⋮ 菜单里同样有 Templates）
+    // ── 步骤 3：打开模板面板 + 选模板，校验内容真的插入 ──
+    this._log('步骤 3/6: 打开模板面板并选择模板...');
     await this._openTemplatesPanel();
     await this._sleep(1000);
     await this._selectTemplate(templateName);
     await this._sleep(1000);
     await this._handleInsertFilesDialog();
+    await this._sleep(500);
+    const afterTemplate = await this._readReplyBoxState();
+    await this._saveReinviteDebugShot('step3-template-inserted');
+    this._log(`第 3 步插入后正文片段: ${afterTemplate.bodyText || '(空)'}`);
+    if (!afterTemplate.hasBox || !afterTemplate.bodyText) {
+      await this._saveReinviteDebugShot('step3-FAIL');
+      throw new Error('第 3 步失败：选择模板后正文仍为空，模板内容未插入回复框');
+    }
+    this._log('✅ 第 3 步通过：模板内容已插入正文');
 
-    // 5. 定时发送
+    // ── 步骤 4：替换 {{firstName}} 占位符（复用首次触达的 _fillRecipientName）──
+    this._log('步骤 4/6: 替换正文 {{firstName}} 占位符...');
+    await this._fillRecipientName(firstName);
+
+    // ── 步骤 5：发送前状态检查 ──
+    this._log('步骤 5/6: 发送前状态检查...');
+    const beforeSend = await this._readReplyBoxState();
+    await this._saveReinviteDebugShot('step5-before-send');
+    this._log(`第 5 步收件人: ${beforeSend.recipients || '(未读到，回复沿用原线程发件人)'}`);
+    this._log(`第 5 步正文片段: ${beforeSend.bodyText || '(空)'}`);
+    this._log(`第 5 步回复框状态: 存在=${beforeSend.hasBox} 可编辑=${beforeSend.editable} 已聚焦=${beforeSend.focused}`);
+
+    // ── 步骤 6：定时发送 + 等待确认（内部轮询打印每次状态）──
+    this._log('步骤 6/6: 设置定时发送并等待确认...');
     await this._scheduleSendReply();
 
-    // 6. 关闭残留窗口
+    // 收尾：关闭残留窗口
     await this._closeAnyComposeWindow();
 
     this._log(`✅ 复邀流程完成: ${email}`);
@@ -399,42 +443,164 @@ class GmailAutomation extends EventEmitter {
   }
 
   // 点搜索结果的第一条（最新）邮件。Gmail 列表新→旧排列，取 DOM 第一个可见行。
+  //
+  // ★ 修复：整行 click 会点到正文预览里的附件缩略图（点偏到图片上，没进详情页），
+  //   导致后续 _clickReply 找不到 Reply 按钮。这里按「主题文本 → 键盘 j/Enter → 发件人列」
+  //   三级降级，每级点击后都校验是否已进入详情页，全部失败才抛错（附带列表诊断）。
+  //   注：本修复对 _clickReply 也有正向影响 —— 若误点到图片导致焦点不在正文，其键盘 R 兜底会失效；
+  //   这里保证进入详情页后，_clickReply 的点击/键盘两条路都能正常工作。
   async _openFirstEmail() {
     this._log('点击搜索结果第一条（最新）邮件...');
-    const row = this.page.locator(
-      'div[role="main"] tr[role="row"], div[role="main"] tr.zA, div[role="main"] tr.yO'
-    ).filter({ visible: true }).first();
+
+    // ── 方案 A：点主题文本，绕开右侧附件缩略图 ──
+    // 注意：不能用 _waitForAnyVisible（它固定取 .last()，会命中最后一行），这里必须 .first() 取最新邮件。
     try {
-      await row.waitFor({ state: 'visible', timeout: 15000 });
-    } catch {
-      throw new Error('未找到该邮箱的往来邮件（搜索结果为空）');
+      const subject = this.page.locator(
+        'div[role="main"] tr.zA .bog, div[role="main"] tr.yO .bog, div[role="main"] .bog, div[role="main"] .y6 span'
+      ).filter({ visible: true }).first();
+      await subject.waitFor({ state: 'visible', timeout: 8000 });
+      await subject.click();
+      if (await this._isEmailDetailOpen(5000)) {
+        this._log('✅ 方案 A（点主题文本）成功打开邮件');
+        return;
+      }
+    } catch (err) {
+      this._log(`方案 A 未成功: ${err.message}`);
     }
-    await row.click();
-    await this._sleep(3000);
+    this._log('方案 A 失败，降级方案 B（键盘 j + Enter）...');
+
+    // ── 方案 B：键盘 j 移到第一封，再 Enter 打开（不依赖鼠标坐标，最不受附件干扰）──
+    try {
+      // 先把焦点从搜索框/输入框移开，确保 j/k 快捷键生效
+      await this.page.evaluate(() => {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+          document.activeElement.blur();
+        }
+      });
+      await this.page.keyboard.press('j');
+      await this._sleep(600);
+      await this.page.keyboard.press('Enter');
+      if (await this._isEmailDetailOpen(5000)) {
+        this._log('✅ 方案 B（键盘）成功打开邮件');
+        return;
+      }
+    } catch (err) {
+      this._log(`方案 B 未成功: ${err.message}`);
+    }
+    this._log('方案 B 失败，降级方案 C（点发件人列）...');
+
+    // ── 方案 C：点左侧发件人列（避开右侧附件区）──
+    try {
+      const sender = this.page.locator(
+        'div[role="main"] tr.zA .yW span, div[role="main"] tr.yO .yW span, div[role="main"] .yW span'
+      ).filter({ visible: true }).first();
+      await sender.waitFor({ state: 'visible', timeout: 8000 });
+      await sender.click();
+      if (await this._isEmailDetailOpen(5000)) {
+        this._log('✅ 方案 C（发件人列）成功打开邮件');
+        return;
+      }
+    } catch (err) {
+      this._log(`方案 C 未成功: ${err.message}`);
+    }
+
+    // ── 全部失败：抛错 + 诊断 ──
+    throw new Error('无法打开搜索结果第一条邮件。' + await this._dumpEmailListDiagnostics());
   }
 
-  // 点邮件里的 Reply / 回复 按钮（找不到时用键盘 R 兜底）
+  // 是否已进入邮件详情页（Reply 按钮或邮件正文容器出现）
+  async _isEmailDetailOpen(timeout = 5000) {
+    const el = await this._waitForAnyVisible([
+      'div[role="button"][data-tooltip="Reply"]',
+      'div[role="button"][aria-label*="Reply"]',
+      'div[role="button"][aria-label*="回复"]',
+      'div[role="main"] .a3s',
+      'div[role="main"] .ii.gt',
+      'div[role="main"] div[data-message-id]',
+    ], timeout);
+    return !!el;
+  }
+
+  // 诊断：当前搜索结果可见行数 + 每行可见主题文本，方便定位「为什么没打开」
+  async _dumpEmailListDiagnostics() {
+    try {
+      const info = await this.page.evaluate(() => {
+        const rows = Array.from(document.querySelectorAll(
+          'div[role="main"] tr[role="row"], div[role="main"] tr.zA, div[role="main"] tr.yO'
+        )).filter(el => el.offsetParent !== null);
+        const subjects = rows.slice(0, 10).map((el) => {
+          const subjectEl = el.querySelector('.bog, .y6 span, span[data-thread-id]');
+          return ((subjectEl ? subjectEl.innerText : '') || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+        });
+        return { rowCount: rows.length, subjects };
+      });
+      return `搜索结果可见行数=${info.rowCount}; 可见主题=[${info.subjects.join(' | ')}]`;
+    } catch (err) {
+      return `（诊断失败: ${err.message}）`;
+    }
+  }
+
+  // 点邮件里的 Reply / 回复 按钮（找不到时用键盘 R 兜底）。
+  //
+  // ★ 修复：Reply 按钮实际是 span[role="link"]（class="ams bkH"、aria-label 为空、
+  //   靠内部文本 "Reply" 表达），不是 div[role="button"][aria-label*="Reply"]。
+  //   旧选择器（div[role=button]/span[data-tooltip]）全部 count=0，只能靠键盘 R 兜底。
+  //   这里补充 span[role="link"] 与 :text-is 精确文本匹配，逐个候选做「visible + enabled」校验，
+  //   点完再验证回复框真的打开（内联回复框出现可编辑正文文本框），不误报成功。
   async _clickReply() {
     this._log('点击 Reply / 回复 按钮...');
     await this.page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     await this._sleep(800);
 
     const replySelectors = [
+      'div[role="button"][aria-label="Reply"]',
+      'div[role="button"][aria-label="回复"]',
       'div[role="button"][data-tooltip="Reply"]',
-      'div[role="button"][aria-label*="Reply"]',
-      'div[role="button"][aria-label*="回复"]',
-      'span[data-tooltip="Reply"]',
-      'span[data-tooltip="回复"]',
+      'span[role="link"][aria-label="Reply"]',
+      'span[role="link"][aria-label="回复"]',
+      'span[role="link"]:text-is("Reply")',
+      'span[role="link"]:text-is("回复")',
+      '[role="link"]:text-is("Reply")',
+      '[role="link"]:text-is("回复")',
     ];
-    const replyBtn = await this._waitForAnyVisible(replySelectors, 10000);
-    if (!replyBtn) {
+
+    // 逐个候选挑「可见且 enabled」的按钮；从后往前取（DOM 里最新邮件在最下）最新邮件的 Reply
+    let replyBtn = null;
+    for (const sel of replySelectors) {
+      const loc = this.page.locator(sel);
+      const n = await loc.count();
+      for (let i = n - 1; i >= 0; i--) {
+        const el = loc.nth(i);
+        if ((await el.isVisible()) && (await el.isEnabled())) { replyBtn = el; break; }
+      }
+      if (replyBtn) break;
+    }
+
+    if (replyBtn) {
+      await this._logHitElement(replyBtn, 'Reply 按钮');
+      await replyBtn.click();
+      this._log('已点击 Reply 按钮');
+    } else {
       this._log('未找到 Reply 按钮，尝试键盘快捷键 R...');
       await this.page.keyboard.press('r');
+    }
+
+    // 验证回复框真的打开（内联回复框出现可编辑正文文本框 / More send options 按钮）
+    const opened = await this._waitForAnyVisible([
+      'div[role="textbox"][aria-label*="Message Body"]',
+      'div[role="textbox"][contenteditable="true"]',
+      '.Am.Al.editable',
+      'div[role="button"][aria-label="More send options"]',
+    ], 5000);
+
+    if (opened) {
+      this._log('✅ 回复框已打开');
       await this._sleep(3000);
       return;
     }
-    await replyBtn.click();
-    await this._sleep(3000);
+
+    await this._diagnoseSelectorMatches(replySelectors, '点击 Reply 后未打开回复框');
+    throw new Error('点击 Reply 后未打开回复框（键盘 R 兜底也失败）');
   }
 
   // 复邀定时发送：回复是内联回复框，不在 div[role="dialog"] 里，
@@ -442,6 +608,8 @@ class GmailAutomation extends EventEmitter {
   async _scheduleSendReply() {
     this._log('正在设置复邀邮件的定时发送...');
 
+    // ── 定时发送第 1 步：点 More send options，确认 Schedule send 出现 ──
+    this._log('定时发送第 1 步: 点 More send options...');
     // 找回复框里的 "More send options" 下拉箭头（全页可见的即可，回复框是当前唯一活动写信区）
     let dropArrow = null;
     const allButtons = await this.page.$$('div[role="button"]');
@@ -454,12 +622,17 @@ class GmailAutomation extends EventEmitter {
       }
     }
     if (!dropArrow) {
-      throw new Error('无法找到回复框的 More send options 下拉箭头');
+      await this._saveReinviteScheduleDebugShot('schedule-step1-FAIL-no-arrow');
+      throw new Error('定时发送第 1 步失败：找不到回复框的 More send options 下拉箭头');
     }
+    await this._logHitElement(dropArrow, '复邀-More send options 箭头');
     await dropArrow.click();
     await this._sleep(800);
+    await this._debugDumpMenuItems('复邀-点 More send options 后可见菜单项');
+    await this._saveReinviteScheduleDebugShot('schedule-step1-menu');
 
-    // 选择 Schedule send / 安排发送
+    // ── 定时发送第 2 步：点 Schedule send，dump 时间面板真实结构 ──
+    this._log('定时发送第 2 步: 点 Schedule send...');
     const scheduleOptionSelectors = [
       '[role="menuitem"][aria-label*="Schedule"]',
       '[role="menuitem"][aria-label*="安排"]',
@@ -471,81 +644,43 @@ class GmailAutomation extends EventEmitter {
     let scheduleOption = await this._waitForAnyVisible(scheduleOptionSelectors, 8000);
     if (!scheduleOption) {
       await this._debugDumpMenuItems('复邀 - 查找 Schedule send 失败');
-      throw new Error('无法找到定时发送选项（Schedule send / 安排发送）');
+      await this._saveReinviteScheduleDebugShot('schedule-step2-FAIL');
+      throw new Error('定时发送第 2 步失败：找不到 Schedule send 选项');
     }
+    await this._logHitElement(scheduleOption, '复邀-Schedule send 选项');
     await scheduleOption.click();
-    await this._sleep(800);
+    await this._sleep(1000);
+    await this._dumpScheduleTimePanel('step2-after-schedule-send');
+    await this._saveReinviteScheduleDebugShot('schedule-step2-time-panel');
 
-    // 选择 Pick date & time
+    // ── 定时发送第 3 步（诊断）：尝试点 "Pick date & time"，dump 第二层日期时间选择面板 ──
+    this._log('定时发送第 3 步(诊断): 尝试点 Pick date & time...');
     const pickDateSelectors = [
       'text="Pick date & time"',
       'text="选择日期和时间"',
+      '[role="menuitem"]:has-text("Pick date")',
       'div[role="menuitem"]:has-text("Pick date")',
+      '[role="option"]:has-text("Pick date")',
     ];
-    let pickDateFound = false;
+    let pickDate = null;
     for (const selector of pickDateSelectors) {
       try {
-        const pickDate = await this.page.$(selector);
-        if (pickDate && await pickDate.isVisible()) {
-          await pickDate.click();
-          pickDateFound = true;
-          break;
-        }
+        const el = await this.page.$(selector);
+        if (el && await el.isVisible()) { pickDate = el; break; }
       } catch (err) {}
     }
-    if (!pickDateFound) {
-      this._log('未找到自定义日期时间选项，继续');
-    }
-    await this._sleep(800);
-
-    // 设置时间
-    const hour12 = this.scheduleHour > 12 ? this.scheduleHour - 12 : (this.scheduleHour === 0 ? 12 : this.scheduleHour);
-    const ampm = this.scheduleHour >= 12 ? 'PM' : 'AM';
-    const minute = String(this.scheduleMinute || 0).padStart(2, '0');
-    const timeStr = `${hour12}:${minute} ${ampm}`;
-    this._log(`正在设置定时时间: ${timeStr}`);
-
-    const timeInput = await this.page.$('input[aria-label="Time"]');
-    if (timeInput && await timeInput.isVisible()) {
-      await timeInput.click();
-      await timeInput.fill('');
-      await timeInput.fill(timeStr);
+    if (pickDate) {
+      await this._logHitElement(pickDate, '复邀-Pick date & time 选项');
+      await pickDate.click();
+      await this._sleep(1000);
+      await this._dumpScheduleTimePanel('step3-after-pick-date');
+      await this._saveReinviteScheduleDebugShot('schedule-step3-pick-date-panel');
     } else {
-      await this.page.evaluate((t) => {
-        const input = document.querySelector('input[aria-label="Time"]');
-        if (input) {
-          input.value = t;
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }, timeStr);
-    }
-    await this.page.keyboard.press('Enter');
-    await this._sleep(1000);
-
-    // 点击确认发送
-    const confirmSelectors = [
-      'button[aria-label*="Schedule"]',
-      '[role="button"][aria-label*="Schedule"]',
-      '[aria-label*="安排发送"]',
-      'button:has-text("Schedule send")',
-      'div[role="button"]:has-text("Schedule send")',
-      'button:has-text("安排发送")',
-      'div[role="button"]:has-text("安排发送")',
-    ];
-    const confirmBtn = await this._waitForAnyVisible(confirmSelectors, 5000);
-    if (confirmBtn) {
-      await confirmBtn.click();
-      this._log('已点击确认发送（Schedule send）');
-    } else {
-      this._log('确认发送按钮超时，尝试按 Enter 兜底');
-      await this.page.keyboard.press('Enter');
-      await this._sleep(2000);
+      this._log('未找到 Pick date & time 选项（可能 Schedule send 已直接展开完整时间面板）');
     }
 
-    await this._sleep(2000);
-    await this._handleConfirmationDialog();
-    await this._closeAllDialogs();
+    // 时间选择逻辑（A）尚未实现 —— 先暂停，等根据上方 dump 结果提供准确选择器后再实现
+    throw new Error('定时发送诊断暂停：时间面板已完整 dump（见上方日志 + screenshots/reinvite-schedule-debug/）。请提供准确的时间选择器（选日期/时间的可点元素）后，再实现选时间逻辑（A）。');
   }
 
   // ─── 1. 点击 Compose ─────────────────────────────
@@ -645,35 +780,79 @@ class GmailAutomation extends EventEmitter {
     // ★ 弹窗可能盖住编辑器工具栏：安全警告是异步出现的，上一步没等到的话会在这里挡住三点菜单
     await this._dismissSecurityWarning(3000);
 
-    // 点击邮件编辑器中的三点菜单（先直接点击，失败再失焦重试）
+    // ★ 三点菜单（More options）按钮候选。注意：不能用 .ams.bkH —— 那是邮件底部的「Reply」
+    //   按钮（span[role=link]，已实测），点了只会触发回复。真正的 ⋮ 在写信/回复框内：
+    //   1) 写信 dialog 的 ⋮ 有稳定 aria-label="More options"；
+    //   2) 内联回复框的 ⋮ 可能没有稳定 aria-label，退而求其次限定在 .aDh（写信/回复卡片）内找，
+    //      避免误中邮件正文自身的 ⋮ 按钮（正是这次的 bug 来源）。
     const moreOptionsSelectors = [
         'div[role="button"][aria-label="More options"]',
         'div[role="button"][aria-label="更多选项"]',
-        'div[aria-label*="More options"]',
-        'div[aria-label*="更多选项"]',
-        '.ams.bkH'
+        'div[aria-label="More options"]',
+        'div[aria-label="更多选项"]',
+        '[aria-label="More options"]',
+        '[aria-label="更多选项"]',
+        '.aDh .btC [role="button"][aria-haspopup="menu"]',
+        '.aDh [role="button"][aria-haspopup="menu"]',
+        '.aDh [role="button"][aria-label*="More"]',
+        '.aDh [role="button"][aria-label*="更多"]',
     ];
 
-    // ★★★ 修复：原来是 for 循环 + locator.isVisible({ timeout: 2000 })。
-    // isVisible() 的 timeout 会被 Playwright 忽略、立即返回 —— 等于每个选择器只「看一眼」、
-    // 一次都不等。编辑器工具栏渲染稍慢就会被判定「无法找到三点菜单按钮」。
-    // 改用 _waitForAnyVisible：五个选择器共用一份等待预算，且按选择器顺序挑可见的那个。
-    let menuBtn = await this._waitForAnyVisible(moreOptionsSelectors, 5000);
+    // 在「候选选择器（visible+enabled）→ 工具栏最后一个按钮」两阶段里找三点菜单
+    const findThreeDot = async () => {
+      // 阶段一：候选选择器，逐个元素校验 visible + enabled
+      for (const sel of moreOptionsSelectors) {
+        const loc = this.page.locator(sel);
+        const n = await loc.count();
+        for (let i = 0; i < n; i++) {
+          const el = loc.nth(i);
+          if ((await el.isVisible()) && (await el.isEnabled())) return el;
+        }
+      }
+      // 阶段二：兜底 —— 写信/回复框工具栏内最后一个「可见且 enabled」的按钮（⋮ 通常在工具栏最右）
+      const toolbars = this.page.locator('.aDh .btC, .btC');
+      const tbCount = await toolbars.count();
+      for (let t = tbCount - 1; t >= 0; t--) {
+        const btns = toolbars.nth(t).locator('[role="button"]');
+        const bCount = await btns.count();
+        for (let i = bCount - 1; i >= 0; i--) {
+          const el = btns.nth(i);
+          if ((await el.isVisible()) && (await el.isEnabled())) return el;
+        }
+      }
+      return null;
+    };
 
-    // 第一次失败：移除编辑器焦点后重试一次
+    let menuBtn = await findThreeDot();
+
+    // 第一次失败：移除编辑器焦点后重试一次（保留原有的失焦重试逻辑）
     if (!menuBtn) {
-        this._log('三点菜单直接点击失败，尝试移除焦点后重试...');
-        await this._ensureEditorBlur();
-        menuBtn = await this._waitForAnyVisible(moreOptionsSelectors, 5000);
+      this._log('三点菜单直接定位失败，尝试移除焦点后重试...');
+      await this._ensureEditorBlur();
+      await this._sleep(500);
+      menuBtn = await findThreeDot();
     }
 
     if (!menuBtn) {
-        throw new Error('无法找到编辑器中的三点菜单按钮');
+      await this._diagnoseSelectorMatches(moreOptionsSelectors, '三点菜单未找到');
+      await this._diagnosePopupState('三点菜单未找到');
+      throw new Error('无法找到写信框/回复框中的三点菜单按钮');
     }
 
+    await this._logHitElement(menuBtn, '三点菜单按钮');
     await menuBtn.click();
     this._log('已点击三点菜单');
     await this._sleep(1000);
+
+    // ★ 验证菜单面板真的弹出（[role=menu]/[role=menuitem] 可见），避免误报「已点击」
+    const menuOpen = await this._waitForAnyVisible(['[role="menu"]', '[role="menuitem"]'], 3000);
+    if (!menuOpen) {
+      await this._diagnosePopupState('点击三点菜单后(未弹出面板)');
+      throw new Error('点击三点菜单后未出现菜单面板');
+    }
+    this._log('✅ 三点菜单面板已弹出');
+    await this._debugDumpMenuItems('点击三点菜单后');
+    await this._diagnosePopupState('点击三点菜单后');
 
     // ===== 等待模板菜单项变为可用 =====
     // ★★★ 修复：原来这里用 page.waitForFunction((sel) => document.querySelector(sel), {timeout:5000}, selector)。
@@ -705,6 +884,9 @@ class GmailAutomation extends EventEmitter {
     }
 
     if (!templatesItem) {
+        // 诊断：区分 (a) 面板根本没弹出 vs (b) 面板有但缺"模板"项
+        await this._diagnosePopupState('找不到模板项时');
+        await this._debugDumpMenuItems('找不到模板项时');
         throw new Error('无法找到"模板"菜单项');
     }
 
@@ -773,6 +955,65 @@ async _handleInsertFilesDialog() {
     
     this._log(`已填写收件人: ${email}`);
 }
+
+  // ─── 4.5 替换正文占位符 ─────────────────────────
+
+  // 把撰写框正文里的 {{firstName}} 替换成真实名字；无名字时替换成 "there"，
+  // 保证 "Hi {{firstName}}," 不会变成 "Hi ,"。正文里没有占位符则记日志跳过。
+  async _fillRecipientName(firstName) {
+    const replacement = (firstName && String(firstName).trim()) ? String(firstName).trim() : 'there';
+    this._log(`替换正文占位符 {{firstName}} → "${replacement}"`);
+
+    // 定位撰写框正文：限定在写信 dialog 内，多选择器兜底 + visible 校验
+    const body = await this._waitForAnyVisible([
+      'div[role="dialog"] div[role="textbox"][aria-label*="Message Body"]',
+      'div[role="dialog"] div[role="textbox"][contenteditable="true"]',
+      'div[role="dialog"] div[role="textbox"]',
+      'div[role="textbox"][aria-label*="Message Body"]',
+      'div[role="textbox"][contenteditable="true"]',
+      'div[role="textbox"]',
+    ], 5000);
+
+    if (!body) {
+      this._log('⚠️ 未找到撰写框正文，跳过 {{firstName}} 替换');
+      return;
+    }
+
+    // 诊断：替换前打印正文片段
+    try {
+      const before = await body.evaluate(el => (el.innerText || '').replace(/\s+/g, ' ').slice(0, 200));
+      this._log(`替换前正文片段: ${before}`);
+    } catch (e) { /* 诊断失败不影响主流程 */ }
+
+    // 直接改 contenteditable 文本（只改文本节点，保留图片/链接等富文本结构），
+    // 替换后触发 input 事件，避免 Gmail 内部状态没同步导致发出去还是占位符。
+    const result = await body.evaluate((el, repl) => {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let node;
+      let replaced = false;
+      while ((node = walker.nextNode())) {
+        if (node.nodeValue && node.nodeValue.indexOf('{{firstName}}') !== -1) {
+          node.nodeValue = node.nodeValue.split('{{firstName}}').join(repl);
+          replaced = true;
+        }
+      }
+      if (replaced) {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      return { replaced };
+    }, replacement);
+
+    if (result && result.replaced) {
+      this._log(`✅ 已替换 {{firstName}} → "${replacement}"`);
+      // 诊断：替换后打印结果
+      try {
+        const after = await body.evaluate(el => (el.innerText || '').replace(/\s+/g, ' ').slice(0, 200));
+        this._log(`替换后正文片段: ${after}`);
+      } catch (e) { /* 诊断失败不影响主流程 */ }
+    } else {
+      this._log('正文中不存在 {{firstName}}，跳过替换');
+    }
+  }
 
   // ─── 5. 修改主题 ─────────────────────────────────
 
@@ -1049,8 +1290,9 @@ async _scheduleSend() {
         }
     }
 
-    // 点击发送后不重试，只等待结果
-    await this._sleep(2000);
+    // 点击发送后不重试，只等待结果：必须等 Gmail 确认发送真正完成
+    // （长邮件会停留在 "Sending..." 状态较久，固定 sleep(2s) 会提前收尾、打断提交）
+    await this._waitForSendComplete();
 
     // 处理可能出现的确认弹窗（如 "此邮件将定时发送"）
     await this._handleConfirmationDialog();
@@ -1182,6 +1424,132 @@ async _handleConfirmationDialog() {
     }
 }
 
+  // ─── 8.6 等待发送完成 ────────────────────────────
+
+  // 轮询等待 Gmail 真正完成发送（长邮件会长时间停留在 "Sending..."/"Still sending" 状态，
+  // 不能只靠固定 sleep）。首次触达（独立撰写浮层）和复邀（内联回复框）都走这里。
+  //
+  // 判定成功（满足其一）：
+  //   1. 出现 "Message sent/已发送/Message scheduled/已安排发送" 的 toast；
+  //   2. 页面稳定进入「无 Sending 指示 +（之前见过 Sending 或 写信/回复框已关闭）」状态 ≥3 秒
+  //      —— 复邀的回复框在点击发送后会很快收起、但长邮件后台仍在提交，
+  //         所以「回复框关闭」不能单独当成功，必须等 Sending 指示也消失，并稳定几秒防弹回。
+  // 判定失败：出现 "wasn't sent"/"无法发送" 等错误提示。等待期间绝不做任何收尾动作。
+  async _waitForSendComplete(timeoutMs = 120000, shotDir = 'send-debug') {
+    this._log(`等待 Gmail 确认发送完成（最长 ${Math.round(timeoutMs / 1000)} 秒，轮询中）...`);
+    const start = Date.now();
+    let lastState = null;
+    let sawSending = false;   // 是否曾观察到 "Sending..." 指示
+    let doneSince = null;     // 「看起来完成」状态开始持续的时间戳
+    let lastShot = 0;         // 上次诊断截图时间
+
+    while (Date.now() - start < timeoutMs) {
+      const state = await this._getSendState();
+      lastState = state;
+
+      // 1) 失败信号优先
+      if (state.failed) {
+        await this._saveSendDebugShot('failed', shotDir);
+        throw new Error('Gmail 提示发送失败：' + (state.toastText || state.bodySnippet));
+      }
+
+      // 2) 成功信号：出现 "已发送 / 已安排发送" toast
+      if (state.sent) {
+        this._log('✅ 检测到发送成功提示：' + (state.toastText || ''));
+        return;
+      }
+
+      if (state.sending) {
+        // 仍在发送中 → 继续等，并记录「见过 Sending」
+        sawSending = true;
+        doneSince = null;
+        this._log('仍在发送中（Sending...），继续等待...');
+      } else {
+        // 「看起来完成」= 无 Sending 指示，且（之前见过 Sending，或写信/回复框已关闭）
+        const looksDone = sawSending || !state.composeOpen;
+        if (looksDone) {
+          if (doneSince === null) doneSince = Date.now();
+          if (Date.now() - doneSince >= 3000) {
+            this._log(sawSending
+              ? '✅ "Sending..." 指示已消失且稳定，判定后台发送完成'
+              : '✅ 写信/回复框已稳定关闭（≥3 秒），判定发送完成');
+            return;
+          }
+        } else {
+          doneSince = null;
+        }
+      }
+
+      // 诊断截图：每隔几秒一张，方便卡住时定位 Gmail 停在哪一步
+      if (Date.now() - lastShot >= 5000) {
+        await this._saveSendDebugShot('sending-wait', shotDir);
+        lastShot = Date.now();
+      }
+
+      await this._sleep(2000);
+    }
+
+    await this._saveSendDebugShot('timeout', shotDir);
+    const detail = lastState
+      ? `可见提示=[${lastState.toastText || '无'}]; 仍在发送=${lastState.sending}; 写信/回复框还开着=${lastState.composeOpen}; 页面片段=[${lastState.bodySnippet}]`
+      : '（无法读取页面状态）';
+    throw new Error(`等待 Gmail 发送确认超时（${Math.round(timeoutMs / 1000)} 秒）。${detail}`);
+  }
+
+  // 发送等待期间的诊断截图，存到 screenshots/<shotDir>/（已被 .gitignore 忽略）
+  async _saveSendDebugShot(label, shotDir = 'send-debug') {
+    try {
+      const dir = path.join(__dirname, 'screenshots', shotDir);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const file = path.join(dir, `${ts}_${label}.png`);
+      await this.page.screenshot({ path: file });
+      this._log(`📸 发送诊断截图: ${file}`);
+    } catch (e) {
+      this._log('⚠️ 发送诊断截图失败: ' + e.message);
+    }
+  }
+
+  // 读取当前发送状态：写信框是否还开着 / 是否在发送中 / 是否出现成功或失败提示。
+  // 成功提示只从 toast 容器里取（避免扫到左侧栏 "Sent/已发送"、"Scheduled/已安排" 标签导致误判）；
+  // 失败提示和 "Sending..." 指示则扫整页可见文本（它们在写信窗口/错误提示里，不在侧栏）。
+  async _getSendState() {
+    try {
+      return await this.page.evaluate(() => {
+        const toastText = Array.from(document.querySelectorAll(
+          '[role="status"], [role="alert"], [aria-live="assertive"], [aria-live="polite"]'
+        ))
+          .filter(el => el.offsetParent !== null || el.getClientRects().length > 0)
+          .map(el => (el.innerText || '').trim().replace(/\s+/g, ' '))
+          .filter(t => t)
+          .join(' | ');
+
+        const composeOpen = !!(
+          document.querySelector('input[name="subjectbox"]') ||
+          document.querySelector('div[role="textbox"][aria-label*="Message Body"], div[role="textbox"][aria-label*="邮件正文"]')
+        );
+
+        const bodyText = (document.body.innerText || '').replace(/\s+/g, ' ');
+        const lowerToast = toastText.toLowerCase();
+        const lowerBody = bodyText.toLowerCase();
+
+        return {
+          composeOpen,
+          sending: /still\s+sending|sending\.\.\.|正在发送|发送中/.test(lowerBody),
+          sent: /message\s+sent|message\s+scheduled|scheduled\s+send|已发送|已安排发送|已定时发送/.test(lowerToast),
+          failed: /wasn't\s+sent|was\s+not\s+sent|message\s+not\s+sent|无法发送|发送失败/.test(lowerToast) ||
+                  /wasn't\s+sent|was\s+not\s+sent|message\s+not\s+sent|无法发送|发送失败/.test(lowerBody),
+          toastText: toastText.slice(0, 300),
+          bodySnippet: bodyText.slice(0, 300),
+        };
+      });
+    } catch (err) {
+      // evaluate 失败（页面跳转等）—— 返回「都未知、继续等」的保守状态，交给外层超时兜底
+      this._log('⚠️ 读取发送状态失败: ' + err.message);
+      return { composeOpen: true, sending: false, sent: false, failed: false, toastText: '', bodySnippet: '' };
+    }
+  }
+
   // ─── 工具方法 ────────────────────────────────────
 
   // 等待「任意一个选择器」出现可见元素，返回其中按选择器顺序最靠前、且最内层（.last()）的那个；
@@ -1251,6 +1619,57 @@ async _handleConfirmationDialog() {
     } catch (e) { /* 诊断失败不影响主流程 */ }
   }
 
+  // 诊断：逐个打印候选选择器的 count 与 visible 数量
+  async _diagnoseSelectorMatches(selectors, label) {
+    this._log(`诊断 - ${label}: 候选选择器匹配情况`);
+    for (const sel of selectors) {
+      try {
+        const loc = this.page.locator(sel);
+        const count = await loc.count();
+        const visible = await loc.filter({ visible: true }).count();
+        this._log(`诊断 - ${label} [count=${count}, visible=${visible}] ${sel}`);
+      } catch (err) {
+        this._log(`诊断 - ${label} [error=${err.message}] ${sel}`);
+      }
+    }
+  }
+
+  // 诊断：打印某 Locator 命中的元素 tag / class / aria-label / outerHTML 片段
+  async _logHitElement(loc, label) {
+    try {
+      const info = await loc.evaluate((el) => ({
+        tag: el.tagName || '',
+        cls: (typeof el.className === 'string') ? el.className : '',
+        aria: el.getAttribute('aria-label') || '',
+        html: (el.outerHTML || '').replace(/\s+/g, ' ').slice(0, 200),
+      }));
+      this._log(`诊断 - ${label} 命中元素: tag=${info.tag} class="${info.cls}" aria-label="${info.aria}"`);
+      this._log(`诊断 - ${label} outerHTML 片段: ${info.html}`);
+    } catch (err) {
+      this._log(`诊断 - ${label} 读取命中元素信息失败: ${err.message}`);
+    }
+  }
+
+  // 诊断：点击后判断「弹出面板」是否存在（menuitem 数 / menu 容器数）
+  async _diagnosePopupState(label) {
+    try {
+      const info = await this.page.evaluate(() => {
+        const menuitems = Array.from(document.querySelectorAll('[role="menuitem"]'))
+          .filter(el => el.offsetParent !== null);
+        const menus = Array.from(document.querySelectorAll('[role="menu"], [role="listbox"]'))
+          .filter(el => el.offsetParent !== null);
+        const texts = menus.map(m => (m.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 100));
+        return { menuitemCount: menuitems.length, menuCount: menus.length, menuTexts: texts };
+      });
+      this._log(`诊断 - ${label}: 可见 menuitem=${info.menuitemCount} 个, 可见菜单容器([role=menu]/[role=listbox])=${info.menuCount} 个`);
+      if (info.menuTexts.length > 0) {
+        this._log(`诊断 - ${label}: 菜单容器文本=[${info.menuTexts.join(' | ')}]`);
+      }
+    } catch (err) {
+      this._log(`诊断 - ${label} 失败: ${err.message}`);
+    }
+  }
+
   // 截图保存到 screenshots/ 目录（已加入 .gitignore，不会提交）
   async _saveScreenshot(name) {
     try {
@@ -1265,6 +1684,213 @@ async _handleConfirmationDialog() {
       this._log(`截图失败: ${e.message}`);
       return null;
     }
+  }
+
+  // 复邀诊断：截图存到 screenshots/reinvite-debug/（已加入 .gitignore，不会提交）。
+  // 文件名带时间戳 + 步骤名，方便卡住时按步骤顺序回看 Gmail 停在哪一步。
+  async _saveReinviteDebugShot(stepName) {
+    try {
+      const dir = path.join(__dirname, 'screenshots', 'reinvite-debug');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const safeName = (stepName || 'step').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const file = path.join(dir, `${ts}_${safeName}.png`);
+      await this.page.screenshot({ path: file, fullPage: false });
+      this._log(`📸 复邀诊断截图: ${file}`);
+      return file;
+    } catch (e) {
+      this._log(`⚠️ 复邀诊断截图失败: ${e.message}`);
+      return null;
+    }
+  }
+
+  // 复邀诊断：读取内联回复框状态（是否存在/可编辑/已聚焦 + 正文片段 + 收件人）。
+  // 纯读取，不改任何 DOM/焦点，避免干扰主流程。
+  async _readReplyBoxState() {
+    try {
+      return await this.page.evaluate(() => {
+        const body = Array.from(document.querySelectorAll(
+          'div[role="textbox"][aria-label*="Message Body"], ' +
+          'div[role="textbox"][contenteditable="true"], ' +
+          '.Am.Al.editable'
+        )).filter(el => el.offsetParent !== null)[0] || null;
+
+        const hasBox = !!body;
+        const bodyText = body ? (body.innerText || '').replace(/\s+/g, ' ').slice(0, 300) : '';
+        const editable = !!body &&
+          (body.getAttribute('contenteditable') === 'true' || body.getAttribute('role') === 'textbox');
+        const active = document.activeElement;
+        const focused = !!body && (active === body || (active && body.contains(active)));
+
+        // 收件人：回复框顶部 To 行 / 收件人 chip，尽力读取（读不到属正常，回复沿用原线程发件人）
+        const recipients = Array.from(document.querySelectorAll(
+          'span[email], div[data-hovercard-id], .oL.aDm span, ' +
+          'div[role="textbox"][aria-label*="To"] span, input[aria-label*="To"]'
+        )).filter(el => el.offsetParent !== null)
+          .slice(0, 6)
+          .map(el => (el.getAttribute('email') || el.getAttribute('data-hovercard-id') || el.innerText || el.value || '').trim())
+          .filter(t => t)
+          .join(', ');
+
+        return { hasBox, bodyText, editable, focused, recipients };
+      });
+    } catch (e) {
+      return { hasBox: false, bodyText: '', editable: false, focused: false, recipients: '' };
+    }
+  }
+
+  // 复邀定时发送诊断：截图存到 screenshots/reinvite-schedule-debug/
+  async _saveReinviteScheduleDebugShot(stepName) {
+    try {
+      const dir = path.join(__dirname, 'screenshots', 'reinvite-schedule-debug');
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const safeName = (stepName || 'step').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const file = path.join(dir, `${ts}_${safeName}.png`);
+      await this.page.screenshot({ path: file, fullPage: false });
+      this._log(`📸 复邀定时发送诊断截图: ${file}`);
+      return file;
+    } catch (e) {
+      this._log(`⚠️ 复邀定时发送诊断截图失败: ${e.message}`);
+      return null;
+    }
+  }
+
+  // 复邀定时发送诊断：读时间输入框当前值 + 时间选择面板是否还在 + 面板 DOM 结构（tag/class/aria）
+  async _readScheduleTimeState() {
+    try {
+      return await this.page.evaluate(() => {
+        const timeInput = document.querySelector('input[aria-label="Time"], input[type="time"]');
+        const value = timeInput ? (timeInput.value || '') : '';
+        const panels = Array.from(document.querySelectorAll(
+          '[role="dialog"], [role="listbox"], [role="menu"], .J-J5-Ji'
+        )).filter(el => el.offsetParent !== null)
+          .slice(0, 5)
+          .map(el => {
+            const tag = (el.tagName || '').toLowerCase();
+            const cls = typeof el.className === 'string' ? el.className : '';
+            const aria = el.getAttribute('aria-label') || '';
+            const txt = (el.innerText || '').replace(/\s+/g, ' ').slice(0, 80);
+            return `${tag} class="${cls}" aria="${aria}" text="${txt}"`;
+          });
+        return { timeInputValue: value, timePanelOpen: panels.length > 0, panelStructure: panels };
+      });
+    } catch (e) {
+      return { timeInputValue: '', timePanelOpen: false, panelStructure: [] };
+    }
+  }
+
+  // 复邀定时发送诊断：完整 dump 时间面板结构（外层容器 HTML + 内部所有可交互元素 + input），
+  // 用于定位真正可点的时间项/时间列表/时间选择控件（Gmail 的 Schedule send 是「选时间」交互，
+  // 不是往 input[aria-label="Time"] 里 fill）。
+  async _dumpScheduleTimePanel(label) {
+    const tag = (label || 'panel').replace(/[^a-zA-Z0-9_-]/g, '_');
+    this._log(`🔍 开始 dump 定时发送时间面板 [${label}]...`);
+    let data = null;
+    try {
+      data = await this.page.evaluate(() => {
+        // 候选容器：可见的 dialog / menu / listbox / tooltip / Gmail 弹层标记，以及带文本的可见容器
+        const containers = Array.from(document.querySelectorAll(
+          '[role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"], .J-J5-Ji, div'
+        )).filter(el => {
+          if (el.offsetParent === null && el.getClientRects().length === 0) return false;
+          return (el.innerText || '').trim().length > 0;
+        }).slice(0, 400);
+
+        // 打分选最相关容器：文本含 schedule / pick date / 安排 / 定时 / 日期 / 时间 等关键词，且尽量是最内层
+        const scored = containers.map(el => {
+          const t = (el.innerText || '').toLowerCase();
+          let score = 0;
+          if (/schedule/.test(t)) score += 4;
+          if (/pick\s*date/.test(t)) score += 4;
+          if (/安排|定时|日期|时间/.test(t)) score += 3;
+          if (/tomorrow|morning|afternoon|monday|tuesday|week|today/.test(t)) score += 2;
+          if (/am|pm/.test(t)) score += 1;
+          return { el, score, textLen: (el.innerText || '').length };
+        }).sort((a, b) => (b.score - a.score) || (a.textLen - b.textLen)); // 高分优先，文本短的优先（更内层）
+
+        const best = scored[0];
+        if (!best) return { outer: null, interactive: [], inputs: [] };
+
+        const el = best.el;
+        const outer = {
+          tag: (el.tagName || '').toLowerCase(),
+          role: el.getAttribute('role') || '',
+          class: (typeof el.className === 'string' ? el.className : '').slice(0, 150),
+          aria: el.getAttribute('aria-label') || '',
+          html: (el.outerHTML || '').replace(/\s+/g, ' ').slice(0, 4000),
+        };
+
+        const interactive = [];
+        const sel = 'button, [role="button"], [role="option"], [role="menuitem"], [role="listbox"], ' +
+          '[role="listitem"], input, [role="combobox"], [role="gridcell"], [role="row"], ' +
+          '[role="checkbox"], [role="radio"], [role="link"], [tabindex]';
+        Array.from(el.querySelectorAll(sel)).filter(n => n.offsetParent !== null || n.getClientRects().length > 0)
+          .slice(0, 80)
+          .forEach(n => {
+            interactive.push({
+              tag: (n.tagName || '').toLowerCase(),
+              role: n.getAttribute('role') || '',
+              class: (typeof n.className === 'string' ? n.className : '').slice(0, 120),
+              aria: n.getAttribute('aria-label') || '',
+              type: n.getAttribute('type') || '',
+              value: (n.value || '').slice(0, 40),
+              text: (n.innerText || '').replace(/\s+/g, ' ').slice(0, 80),
+            });
+          });
+
+        const inputs = Array.from(el.querySelectorAll('input')).slice(0, 20).map(inp => ({
+          type: inp.getAttribute('type') || '',
+          aria: inp.getAttribute('aria-label') || '',
+          name: inp.getAttribute('name') || '',
+          placeholder: inp.getAttribute('placeholder') || '',
+          value: inp.value || '',
+        }));
+
+        return { outer, interactive, inputs };
+      });
+    } catch (e) {
+      this._log(`⚠️ dump 时间面板失败: ${e.message}`);
+      return null;
+    }
+
+    if (!data || !data.outer) {
+      this._log('🔍 未找到可见的时间面板容器（可能面板还没弹出）');
+      await this._saveReinviteScheduleDebugShot('dump-' + tag + '-EMPTY');
+      return data;
+    }
+
+    const o = data.outer;
+    this._log(`🔍 面板外层容器: <${o.tag} role="${o.role}" class="${o.class}" aria="${o.aria}">`);
+    this._log(`🔍 面板外层 HTML(截断 4000 字符): ${o.html}`);
+    this._log(`🔍 面板内可交互元素 ${data.interactive.length} 个:`);
+    data.interactive.forEach(n => {
+      this._log(`🔍   <${n.tag} role="${n.role}" class="${n.class}" aria="${n.aria}" type="${n.type}" value="${n.value}"> text="${n.text}"`);
+    });
+    this._log(`🔍 面板内 input ${data.inputs.length} 个:`);
+    data.inputs.forEach(inp => {
+      this._log(`🔍   <input type="${inp.type}" aria="${inp.aria}" name="${inp.name}" placeholder="${inp.placeholder}" value="${inp.value}">`);
+    });
+    await this._saveReinviteScheduleDebugShot('dump-' + tag);
+    return data;
+  }
+
+  // 复邀定时发送诊断：打印捕获到的 mail.google.com 网络响应，重点标注非 200
+  _printNetworkLog(netResponses) {
+    if (!netResponses || netResponses.length === 0) {
+      this._log('📡 网络监听：未捕获到发往 mail.google.com 的响应');
+      return;
+    }
+    const non200 = netResponses.filter(r => r.status !== 200);
+    this._log(`📡 网络监听：捕获 ${netResponses.length} 个 mail.google.com 响应，非 200 有 ${non200.length} 个`);
+    non200.slice(0, 20).forEach(r => {
+      this._log(`📡 ⚠️ 非200: ${r.method} ${r.status} ${r.url}`);
+    });
+    const tail = netResponses.slice(-8);
+    this._log(`📡 最后 ${tail.length} 个响应:`);
+    tail.forEach(r => {
+      this._log(`📡 ${r.method} ${r.status} ${r.url}`);
+    });
   }
 
   _sleep(ms) {

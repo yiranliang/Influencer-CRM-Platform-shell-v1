@@ -412,16 +412,20 @@ function createServer() {
         return;
       }
 
-      if (recipients.some(r => !r.email)) {
+      // 向后兼容：老调用方可能传纯 email 字符串，统一成 { email } 对象
+      const normalized = recipients.map(r => (typeof r === 'string' ? { email: r } : (r || {})));
+
+      if (normalized.some(r => !r.email)) {
         console.error('[send-emails] ❌ 存在缺少 email 的收件人');
         sendJSON(res, 400, { success: false, error: '收件人缺少 email 字段' });
         return;
       }
 
       // ── 补充默认值 — subjectTemplate / templateName 可选，缺失时使用默认值 ──
-      const processedRecipients = recipients.map(r => ({
+      const processedRecipients = normalized.map(r => ({
         email: r.email,
         name: r.name || (r.email ? r.email.split('@')[0] : ''),
+        firstName: r.firstName || '',
         brand: r.brand || 'Saodimallsu',
         subjectTemplate: r.subjectTemplate || '合作邀请 @',
         templateName: r.templateName || ''
@@ -458,7 +462,7 @@ function createServer() {
           console.log(`[send-emails] [${i + 1}/${processedRecipients.length}] ${r.email} | ${r.brand} | "${subject.substring(0, 50)}"`);
 
           try {
-            await automation.sendSingleEmail(r.email, r.name, templateName, subject, finalScheduleTime);
+            await automation.sendSingleEmail(r.email, r.name, templateName, subject, finalScheduleTime, r.firstName);
             successCount++;
             console.log(`[send-emails] ✅ ${r.email} 已定时`);
           } catch (err) {
@@ -498,7 +502,10 @@ function createServer() {
         sendJSON(res, 400, { success: false, error: '没有收件人' });
         return;
       }
-      if (recipients.some(r => !r.email)) {
+
+      // 归一化：老调用方可能只传 email 字符串，统一成 { email, firstName }
+      const normalized = recipients.map(r => (typeof r === 'string' ? { email: r } : (r || {})));
+      if (normalized.some(r => !r.email)) {
         sendJSON(res, 400, { success: false, error: '收件人缺少 email 字段' });
         return;
       }
@@ -509,7 +516,7 @@ function createServer() {
 
       const finalTemplateName = String(templateName).trim();
       const finalScheduleTime = scheduleTime || '23:10';
-      const processed = recipients.map(r => ({ email: r.email }));
+      const processed = normalized.map(r => ({ email: r.email, firstName: r.firstName || '' }));
       console.log(`[reinvite-emails] ${processed.length} 个红人, 模板: "${finalTemplateName}", 定时: ${finalScheduleTime}`);
 
       // ── 串行复邀循环 ──────────────────────────────
@@ -526,7 +533,7 @@ function createServer() {
           const r = processed[i];
           console.log(`[reinvite-emails] [${i + 1}/${processed.length}] ${r.email}`);
           try {
-            await automation.reinviteSingleEmail(r.email, finalTemplateName, finalScheduleTime);
+            await automation.reinviteSingleEmail(r.email, finalTemplateName, finalScheduleTime, r.firstName);
             successCount++;
             results.push({ email: r.email, status: 'success' });
             console.log(`[reinvite-emails] ✅ ${r.email} 已定时`);
@@ -1104,6 +1111,7 @@ function createServer() {
           influencers.push({
             date: dateStr,
             name: uname,
+            firstName: String(acct.fullName || acct.full_name || '').trim().split(' ')[0] || '',
             email: email,
             brand: '',
             channel: 'Instagram',

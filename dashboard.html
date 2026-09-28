@@ -740,7 +740,7 @@
         /* 同一行两格若一个标签换行、另一个没换，两个输入框就会差几像素对不齐。
            标签一律压成单行 —— 宁可省略号，也不要整行的对齐崩掉。 */
         .pay-form-grid .form-group label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .action-buttons { display: flex; gap: 8px; }
+        .action-buttons { display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: nowrap; }
         .pipeline-row-checkbox, #pipelineSelectAll { cursor: pointer; }
         .edit-btn-icon, .delete-btn-icon { background: none; border: none; cursor: pointer; font-size: 16px; padding: 4px 6px; border-radius: 4px; transition: all 0.2s; }
         .edit-btn-icon:hover { background: #e0e7ff; transform: scale(1.05); }
@@ -1413,22 +1413,23 @@
         /* Outreach 表格 — 固定列宽，防止筛选时列宽跳动 */
         .outreach-table {
             table-layout: fixed; width: 100%; border-collapse: collapse;
-            min-width: 820px; font-size: 13px;
+            min-width: 930px; font-size: 13px;
         }
         .outreach-table th, .outreach-table td {
             padding: 8px 6px; vertical-align: middle;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
-        .outreach-table th:nth-child(1), .outreach-table td:nth-child(1) { width: 30px; }
-        .outreach-table th:nth-child(2), .outreach-table td:nth-child(2) { width: 40px; text-align: center; }
-        .outreach-table th:nth-child(3), .outreach-table td:nth-child(3) { width: 85px; }
-        .outreach-table th:nth-child(4), .outreach-table td:nth-child(4) { width: 100px; }
-        .outreach-table th:nth-child(5), .outreach-table td:nth-child(5) { width: 160px; }
-        .outreach-table th:nth-child(6), .outreach-table td:nth-child(6) { width: 80px; }
-        .outreach-table th:nth-child(7), .outreach-table td:nth-child(7) { width: 70px; }
-        .outreach-table th:nth-child(8), .outreach-table td:nth-child(8) { width: 105px; }
-        .outreach-table th:nth-child(9), .outreach-table td:nth-child(9) { width: 100px; }
-        .outreach-table th:nth-child(10), .outreach-table td:nth-child(10) { width: 50px; text-align: center; }
+        .outreach-table th:nth-child(1), .outreach-table td:nth-child(1) { width: 30px; }  /* 勾选 */
+        .outreach-table th:nth-child(2), .outreach-table td:nth-child(2) { width: 40px; text-align: center; }  /* # */
+        .outreach-table th:nth-child(3), .outreach-table td:nth-child(3) { width: 85px; }   /* 日期 */
+        .outreach-table th:nth-child(4), .outreach-table td:nth-child(4) { width: 100px; }  /* 红人ID */
+        .outreach-table th:nth-child(5), .outreach-table td:nth-child(5) { width: 80px; }   /* 名字 */
+        .outreach-table th:nth-child(6), .outreach-table td:nth-child(6) { width: 160px; }  /* 邮箱 */
+        .outreach-table th:nth-child(7), .outreach-table td:nth-child(7) { width: 80px; }   /* 品牌 */
+        .outreach-table th:nth-child(8), .outreach-table td:nth-child(8) { width: 70px; }   /* 渠道 */
+        .outreach-table th:nth-child(9), .outreach-table td:nth-child(9) { width: 105px; }  /* 状态 */
+        .outreach-table th:nth-child(10), .outreach-table td:nth-child(10) { width: 120px; } /* 备注 */
+        .outreach-table th:nth-child(11), .outreach-table td:nth-child(11) { width: 60px; text-align: center; white-space: nowrap; } /* 操作 */
 
         /* 可复制的单元格 */
         .copy-cell { cursor: pointer; color: #4f46e5; }
@@ -1777,7 +1778,7 @@
                     <table class="outreach-table">
                         <thead>
                             <tr><th style="width:30px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></th>
-                            <th style="width:40px;">#</th><th>日期</th><th>红人ID</th><th>邮箱</th><th>品牌</th><th>渠道</th><th>状态</th><th>备注</th><th></th></tr>
+                            <th style="width:40px;">#</th><th>日期</th><th>红人ID</th><th>名字</th><th>邮箱</th><th>品牌</th><th>渠道</th><th>状态</th><th>备注</th><th></th></tr>
                         </thead>
                         <tbody id="influencerTableBody"></tbody>
                     </table>
@@ -2460,6 +2461,7 @@
         </div>
         <div class="modal-body">
             <div class="form-group"><label>红人ID <span style="color:red;">*</span></label><input type="text" id="add_name" placeholder="请输入红人ID"></div>
+            <div class="form-group"><label>名字</label><input type="text" id="add_firstName" placeholder="请输入名字（如 Courtney）"></div>
             <div class="form-group"><label>邮箱</label><input type="email" id="add_email" placeholder="请输入邮箱"></div>
             <div class="form-group"><label>品牌</label><select id="add_brand"><!-- 由 JavaScript 动态生成 --></select></div>
             <div class="form-group"><label>渠道</label><select id="add_channel"><option value="Instagram">Instagram</option><option value="TikTok">TikTok</option><option value="Youtube">Youtube</option></select></div>
@@ -3523,6 +3525,7 @@
                     '<td style="text-align:center;">' + rowNumber + '</td>' +
                     '<td><input type="date" id="edit_date_' + idx + '" value="' + (item.date ? item.date.replace(/\//g, '-') : '') + '" class="edit-mode-input" style="width:110px"></td>' +
                     '<td><input type="text" id="edit_name_' + idx + '" value="' + escHTML(item.name || '') + '" style="width:100px;padding:4px;"></td>' +
+                    '<td><input type="text" id="edit_firstName_' + idx + '" value="' + escHTML(item.firstName || '') + '" placeholder="名字" style="width:80px;padding:4px;"></td>' +
                     '<td><input type="text" id="edit_email_' + idx + '" value="' + escHTML(item.email) + '" style="width:150px;padding:4px;"></td>' +
                     '<td><input type="text" id="edit_brand_' + idx + '" value="' + escHTML(item.brand || '') + '" class="edit-mode-input" style="width:100px"></td>' +
                     '<td><input type="text" id="edit_channel_' + idx + '" value="' + escHTML(item.channel || '') + '" class="edit-mode-input" style="width:100px"></td>' +
@@ -3536,6 +3539,7 @@
                     '<td style="text-align:center;">' + rowNumber + '</td>' +
                     '<td>' + escHTML(item.date || '-') + '</td>' +
                     '<td><span class="copy-cell">' + escHTML(item.name || '-') + '</span></td>' +
+                    '<td>' + escHTML(item.firstName || '-') + '</td>' +
                     '<td><span class="copy-cell">' + escHTML(item.email) + '</span></td>' +
                     '<td>' + escHTML(item.brand || '-') + '</td>' +
                     '<td>' + escHTML(item.channel || '-') + '</td>' +
@@ -3548,7 +3552,7 @@
                     '</tr>';
             }
         });
-        tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;">暂无数据</td></tr>';
+        tbody.innerHTML = html || '<tr><td colspan="11" style="text-align:center;">暂无数据</td></tr>';
         bindCheckboxEvents();
         updateSelectAllState();
         updatePaginationInfo();
@@ -3563,6 +3567,7 @@
 
         var newName = document.getElementById('edit_name_' + idx)?.value;
         var newEmail = document.getElementById('edit_email_' + idx)?.value;
+        var firstNameInput = document.getElementById('edit_firstName_' + idx);
         var dateInput = document.getElementById('edit_date_' + idx);
         var brandInput = document.getElementById('edit_brand_' + idx);
         var channelInput = document.getElementById('edit_channel_' + idx);
@@ -3577,6 +3582,7 @@
 
         // 更新 Outreach 数据
         if (newName) item.name = newName;
+        if (firstNameInput) item.firstName = firstNameInput.value.trim();
         if (newEmailValue && newEmailValue !== oldEmail) {
             item.email = newEmailValue;
         }
@@ -3958,7 +3964,13 @@
                 var emailIdx = headers.findIndex(function(h) {
                     return h.includes('Email') || h.includes('邮箱') || h.includes('email');
                 });
+                var firstNameIdx = headers.findIndex(function(h) {
+                    var lower = h.trim().toLowerCase();
+                    return lower === 'first_name' || lower === 'firstname' || lower === 'first name' || h.includes('名字');
+                });
                 var nameIdx = headers.findIndex(function(h) {
+                    var lower = h.trim().toLowerCase();
+                    if (lower === 'first_name' || lower === 'firstname' || lower === 'first name') return false; // first_name 是名字列，不是红人ID列
                     return h.includes('Name') || h.includes('红人ID') || h.includes('name');
                 });
                 var brandIdx = headers.findIndex(function(h) {
@@ -3982,6 +3994,7 @@
 
                     var rawEmail = emailIdx >= 0 ? cols[emailIdx]?.trim() : '';
                     var rawName = nameIdx >= 0 ? cols[nameIdx]?.trim() : '';
+                    var rawFirstName = firstNameIdx >= 0 ? cols[firstNameIdx]?.trim() : '';
                     var rawBrand = brandIdx >= 0 ? cols[brandIdx]?.trim() : '';
                     var rawChannel = channelIdx >= 0 ? cols[channelIdx]?.trim() : '';
                     var rawNote = noteIdx >= 0 ? cols[noteIdx]?.trim() : '';
@@ -4022,6 +4035,7 @@
                             id: Date.now() + '_' + Math.random().toString(36).substr(2, 8),
                             email: finalEmail,
                             name: name,
+                            firstName: rawFirstName || '',
                             brand: rawBrand || '',
                             channel: rawChannel || '',
                             note: rawNote || '',
@@ -4153,6 +4167,7 @@
 
     function openAddInfluencerModal() {
         document.getElementById('add_name').value = '';
+        document.getElementById('add_firstName').value = '';
         document.getElementById('add_email').value = '';
         document.getElementById('add_note').value = '';
 
@@ -4171,6 +4186,7 @@
 
     function addNewInfluencer() {
         var name = document.getElementById('add_name').value.trim();
+        var firstName = document.getElementById('add_firstName').value.trim();
         var email = document.getElementById('add_email').value.trim();
         var brand = document.getElementById('add_brand').value;
         var channel = document.getElementById('add_channel').value;
@@ -4221,6 +4237,7 @@
         var newInfluencer = {
             id: newId,
             name: name,
+            firstName: firstName,
             email: finalEmail,
             brand: brand,
             channel: channel,
@@ -4406,6 +4423,7 @@
             return {
                 id: inf.id,
                 email: inf.email,
+                firstName: inf.firstName || '',
                 name: inf.name || inf.email.split('@')[0],
                 brand: brand,
                 subjectTemplate: brandSubjects[brand] || emailConfig[brand]?.subject || '合作邀请 @',
@@ -7062,44 +7080,51 @@
     }
 
     // ── 收集选中 C&D 记录的红人邮箱（去重，兼容汇总/按月两种视图）──
-    function getSelectedCDEmails() {
+    function getSelectedCDRecipients() {
         var boxes = document.querySelectorAll('.cd-row-checkbox:checked');
-        var emails = [];
+        var recipients = [];
         var seen = {};
         boxes.forEach(function(box) {
             var dataId = box.getAttribute('data-id');
             var email = null;
+            var name = '';
             if (cdViewMode === 'aggregated') {
                 email = dataId;
             } else {
                 var item = cdData.find(function(r) { return r.id === dataId; });
-                if (item) email = item.email;
+                if (item) { email = item.email; name = item.name || ''; }
             }
             if (email) {
                 var key = String(email).trim().toLowerCase();
-                if (!seen[key]) { seen[key] = true; emails.push(email); }
+                if (!seen[key]) {
+                    seen[key] = true;
+                    if (!name) {
+                        var rec = cdData.find(function(r) { return r.email === email; });
+                        if (rec) name = rec.name || '';
+                    }
+                    recipients.push({ email: email, firstName: String(name).trim().split(/\s+/)[0] || '' });
+                }
             }
         });
-        return emails;
+        return recipients;
     }
 
     // ── C&D 复邀 ──
     function openReinviteModal() {
-        var emails = getSelectedCDEmails();
-        if (emails.length === 0) { alert('请先勾选要复邀的红人'); return; }
-        document.getElementById('reinviteSummary').innerText = '📧 本次复邀 ' + emails.length + ' 个红人（按邮箱去重）';
+        var recipients = getSelectedCDRecipients();
+        if (recipients.length === 0) { alert('请先勾选要复邀的红人'); return; }
+        document.getElementById('reinviteSummary').innerText = '📧 本次复邀 ' + recipients.length + ' 个红人（按邮箱去重）';
         document.getElementById('reinviteModal').style.display = 'flex';
     }
 
     function confirmReinvite() {
-        var emails = getSelectedCDEmails();
-        if (emails.length === 0) { alert('请先勾选要复邀的红人'); return; }
+        var recipients = getSelectedCDRecipients();
+        if (recipients.length === 0) { alert('请先勾选要复邀的红人'); return; }
         var templateName = ((document.getElementById('reinviteTemplateName') || {}).value || '').trim();
         var scheduleTime = ((document.getElementById('reinviteScheduleTime') || {}).value || '').trim();
         if (!templateName) { alert('请填写 Gmail 模板名'); return; }
         if (!scheduleTime) { alert('请填写定时发送时间'); return; }
 
-        var recipients = emails.map(function(email) { return { email: email }; });
         var confirmBtn = document.querySelector('#reinviteModal .btn-primary');
         if (confirmBtn) confirmBtn.disabled = true;
 
@@ -10596,12 +10621,14 @@ function discoveryAddSelectedToOutreach() {
             var seed = r.seed_username || '';
             return {
                 username: r.username,
+                fullName: r.full_name || r.fullName || '',
                 email: email,
                 note: '粉丝: ' + followers + ' | 分类: ' + category + ' | 来源: ' + seed
             };
         }
         return {
             username: r.username,
+            fullName: r.fullName || r.full_name || '',
             followersCount: r.followersCount,
             postsCount: r.postsCount,
             biography: r.biography,

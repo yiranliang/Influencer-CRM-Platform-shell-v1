@@ -19,5 +19,12 @@
     "icon": "📄",
     "desc": "PDF 合并、拆分、压缩、转换",
     "color": "#ef4444"
+  },
+  {
+    "name": "sdms&aoysky 选款表",
+    "url": "https://docs.google.com/spreadsheets/d/1B4hgpRzIa2JiaOiR1RLOkz6dofiYREZ6G13DImIO1oc/edit?gid=335126675#gid=335126675",
+    "desc": "",
+    "icon": "🌐",
+    "color": "#14b8a6"
   }
 ]
