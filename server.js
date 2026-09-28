@@ -263,7 +263,21 @@ async function checkHomepageBatch(usernames, mode, daysRange, postsLimit) {
       pTags.forEach(function (tg) {
         if (!tagSet.has(tg.toLowerCase())) { tagSet.add(tg.toLowerCase()); hashtags.push(tg); }
       });
-      postsList.push({ timestamp: ts, date: ts ? homeFormatDate(ts) : '', caption: p.caption || '', hashtags: pTags, url: p.url || '' });
+      // 互动数据（Apify 返回字段：likesCount / commentsCount / videoViewCount（或 videoPlayCount，Reels））
+      const likes = (p.likesCount != null) ? (Number(p.likesCount) || 0) : 0;
+      const comments = (p.commentsCount != null) ? (Number(p.commentsCount) || 0) : 0;
+      const views = (p.videoViewCount != null) ? (Number(p.videoViewCount) || null)
+        : ((p.videoPlayCount != null) ? (Number(p.videoPlayCount) || null) : null);
+      postsList.push({
+        timestamp: ts,
+        date: ts ? homeFormatDate(ts) : '',
+        caption: p.caption || '',
+        hashtags: pTags,
+        likesCount: likes,
+        commentsCount: comments,
+        videoViewCount: views,
+        url: p.url || ''
+      });
     });
     postsList.sort(function (a, b) { return b.timestamp - a.timestamp; });
     const lastPostDate = lastTs ? homeFormatDate(lastTs) : '';

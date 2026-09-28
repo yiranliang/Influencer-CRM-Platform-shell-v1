@@ -1064,10 +1064,13 @@
         .homepage-detail-table th { background: #f1f5f9; padding: 6px 8px; text-align: left; font-weight: 500; border-bottom: 1px solid #e2e8f0; }
         .homepage-detail-table td { padding: 6px 8px; border-bottom: 1px solid #e9eef3; vertical-align: top; }
         .homepage-detail-table th:nth-child(1) { width: 120px; }
-        .homepage-detail-table th:nth-child(3) { width: 160px; }
+        .homepage-detail-table th:nth-child(3) { width: 150px; }
         .homepage-detail-table th:nth-child(4), .homepage-detail-table td:nth-child(4) { width: 60px; text-align: center; }
         .homepage-post-link { color: #2563eb; text-decoration: none; font-weight: 500; }
         .homepage-post-link:hover { text-decoration: underline; }
+        .homepage-engagement { white-space: nowrap; }
+        .homepage-engagement .metric { margin-right: 8px; }
+        .homepage-engagement .metric:last-child { margin-right: 0; }
 
         /* 文案截断 + tooltip（深色背景、白字、圆角） */
         .homepage-caption { position: relative; cursor: help; display: inline-block; max-width: 100%; vertical-align: middle; }
@@ -5261,20 +5264,31 @@
         var words = homepageHighlightWords();
         var html = '<tr class="homepage-detail-row" id="' + detailId + '"><td colspan="5">' +
             '<table class="homepage-detail-table"><thead><tr>' +
-            '<th>发帖时间</th><th>文案</th><th>标签</th><th>链接</th>' +
+            '<th>发帖时间</th><th>文案</th><th>互动</th><th>链接</th>' +
             '</tr></thead><tbody>';
         posts.forEach(function(p) {
-            var tags = (Array.isArray(p.hashtags) ? p.hashtags : []).join(' ');
             var url = p.url ? String(p.url) : '';
             html += '<tr>' +
                 '<td>' + escHTML(p.date || '-') + '</td>' +
                 '<td>' + homepageCaptionCell(p.caption, words) + '</td>' +
-                '<td>' + escHTML(tags || '-') + '</td>' +
+                '<td>' + homepageEngagementCell(p) + '</td>' +
                 '<td>' + (url ? '<a class="homepage-post-link" href="' + escAttr(url) + '" target="_blank" rel="noopener noreferrer">查看</a>' : '-') + '</td>' +
                 '</tr>';
         });
         html += '</tbody></table></td></tr>';
         return html;
+    }
+
+    function homepageEngagementCell(p) {
+        function fmt(v) { return (v == null || isNaN(v)) ? '-' : v; }
+        var likes = fmt(p.likesCount);
+        var comments = fmt(p.commentsCount);
+        var views = fmt(p.videoViewCount != null ? p.videoViewCount : p.videoPlayCount);
+        return '<span class="homepage-engagement">' +
+            '<span class="metric" title="点赞">❤️ ' + likes + '</span>' +
+            '<span class="metric" title="评论">💬 ' + comments + '</span>' +
+            '<span class="metric" title="播放">▶️ ' + views + '</span>' +
+            '</span>';
     }
 
     function updateHomepageCheckPagination() {
