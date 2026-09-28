@@ -5280,7 +5280,11 @@
     }
 
     function homepageEngagementCell(p) {
-        function fmt(v) { return (v == null || isNaN(v)) ? '-' : v; }
+        function fmt(v) {
+            var n = (typeof v === 'string') ? parseInt(v, 10) : v;
+            if (n == null || isNaN(n) || n < 0) return '-';
+            return n;
+        }
         var likes = fmt(p.likesCount);
         var comments = fmt(p.commentsCount);
         var views = fmt(p.videoViewCount != null ? p.videoViewCount : p.videoPlayCount);
