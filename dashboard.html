@@ -1295,11 +1295,6 @@
             margin-bottom: 16px;
             color: #1e293b;
         }
-        .processing-cards { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
-        .processing-card { background: white; border-radius: 10px; padding: 10px; width: 160px; border: 1px solid #e9eef3; position: relative; }
-        .processing-card-name { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
-        .processing-card-date { font-size: 11px; color: #6c7a91; }
-        .overdue-badge { position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; font-size: 11px; font-weight: bold; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
         .post-item { background: #f8fafc; border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #e9eef3; }
         /* Pipeline 表格 — 优化列宽，防止重叠 */
         /* overflow-y 必须是 scroll 而不是 auto，理由同 .content-area：
@@ -1798,12 +1793,6 @@
                 </div>
             </div>
 
-            <!-- Overdue 卡片 -->
-            <div class="stats-card">
-                <h3>⏰ Overdue（逾期红人）</h3>
-                <div id="overdue-cards" class="processing-cards"></div>
-            </div>
-
             <!-- 红人寄样列表卡片 -->
             <div class="table-card">
                 <h3>📋 红人寄样列表</h3>
@@ -1847,6 +1836,61 @@
                     <select class="page-size-select" id="pipelinePageSize" onchange="changePipelinePageSize()">
                         <option value="10">10条/页</option><option value="20" selected>20条/页</option><option value="50">50条/页</option><option value="100">100条/页</option>
                     </select>
+                </div>
+            </div>
+
+            <!-- 红人主页检查卡片 -->
+            <div class="table-card">
+                <h3>🔍 红人主页检查</h3>
+                <div class="toolbar pipeline-toolbar">
+                    <div class="toolbar-left">
+                        <span style="font-size:13px;color:#475569;">已勾选 <strong id="homepageSelectedCount" style="color:#4f46e5;">0</strong> 个红人（在寄样列表中勾选）</span>
+                    </div>
+                    <div class="toolbar-right" style="gap:10px;align-items:center;flex-wrap:wrap;">
+                        <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">时间范围
+                            <select id="homepageDaysRange" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                                <option value="7" selected>近 7 天</option>
+                                <option value="15">近 15 天</option>
+                                <option value="30">近 30 天</option>
+                            </select>
+                        </label>
+                        <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">抓取数量
+                            <select id="homepagePostsLimit" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                                <option value="10" selected>每主页 10 条</option>
+                                <option value="5">每主页 5 条</option>
+                                <option value="3">每主页 3 条</option>
+                            </select>
+                        </label>
+                        <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">高亮词
+                            <input type="text" id="homepageHighlightWords" value="amazon, comment, link, shop, code, discount" style="width:220px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                        </label>
+                        <button class="btn-primary" id="homepageCheckBtn" onclick="startHomepageCheck()">🔍 开始检查</button>
+                        <button class="btn-secondary" id="homepageStopBtn" onclick="homepageCheckStop = true" style="display:none;">停止</button>
+                    </div>
+                </div>
+                <div id="homepageCheckStatus" style="font-size:13px;color:#64748b;margin:6px 0;"></div>
+                <div class="pipeline-table-container">
+                    <table class="pipeline-table"><thead><tr>
+                        <th>红人ID</th><th>最后发帖时间</th><th>状态</th><th>帖子文案</th><th>帖子标签</th><th>操作</th>
+                    </tr></thead>
+                    <tbody id="homepageCheckBody"></tbody></table>
+                </div>
+                <div class="pagination-wrapper">
+                    <div class="pagination-info" id="homepageCheckPageInfo">Results 0 - 0 of 0</div>
+                    <div class="pagination-controls">
+                        <button class="page-arrow" id="homepageCheckPrevBtn" onclick="prevHomepageCheckPage()" disabled>‹</button>
+                        <div class="page-numbers" id="homepageCheckPageNumbers"></div>
+                        <button class="page-arrow" id="homepageCheckNextBtn" onclick="nextHomepageCheckPage()" disabled>›</button>
+                    </div>
+                    <div class="pagination-goto">
+                        <span>Go to:</span>
+                        <input type="number" id="homepageCheckGotoPage" min="1" placeholder="1" onkeydown="if(event.key==='Enter'){event.preventDefault();gotoHomepageCheckPageFromInput();}">
+                        <button onclick="gotoHomepageCheckPageFromInput()">跳转</button>
+                    </div>
+                    <select class="page-size-select" id="homepageCheckPageSize" onchange="changeHomepageCheckPageSize()">
+                        <option value="10">10条/页</option><option value="20" selected>20条/页</option><option value="50">50条/页</option><option value="100">100条/页</option>
+                    </select>
+                    <button class="btn-secondary" onclick="exportHomepageCheckCsv()">导出 CSV</button>
                 </div>
             </div>
         </div>
@@ -4013,7 +4057,6 @@
         savePipelineData();
         updatePipelineStats();
         filterPipelineTable();
-        renderOverdueCards();
     }
 
     function batchDelete() {
@@ -4409,7 +4452,7 @@
             generatePipelineMonthOptions();
             updatePipelineStats();
             updateThisWeekStats();
-            renderOverdueCards();
+            loadHomepageCheck();
             renderPipelineStatusFilter();
             filterPipelineTable();
             updateTodayActivity();
@@ -4532,34 +4575,6 @@
         document.getElementById('week-stats-overdue').innerText = weekStats.newOverdue;
     }
 
-    function renderOverdueCards() {
-        var overdue = pipelineData.filter(function(p) { return p.status === 'overdue'; });
-        var now = new Date();
-        // 计算逾期天数（寄样日期 + 21天 = 截止日期）
-        overdue.forEach(function(p) {
-            if (p.sampleDate) {
-                var dueDate = new Date(p.sampleDate);
-                dueDate.setDate(dueDate.getDate() + 21);
-                var diff = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24));
-                p.overdueDays = diff > 0 ? diff : 0;
-            } else {
-                p.overdueDays = 0;
-            }
-        });
-        overdue.sort(function(a, b) { return b.overdueDays - a.overdueDays; });
-        var container = document.getElementById('overdue-cards');
-        if (!container) return;
-        var html = '';
-        overdue.forEach(function(p) {
-            html += '<div class="processing-card" style="position:relative;">' +
-                '<div class="overdue-badge">' + p.overdueDays + '</div>' +
-                '<div class="processing-card-name">' + escHTML(p.name || p.email) + '</div>' +
-                '<div class="processing-card-date">寄样: ' + (p.sampleDate || '-') + ' | 逾期 ' + p.overdueDays + ' 天</div>' +
-                '</div>';
-        });
-        container.innerHTML = html || '<div style="color:#aaa;padding:20px;text-align:center;">暂无逾期红人</div>';
-    }
-
     function renderPipelineStatusFilter() {
         var container = document.getElementById('pipelineStatusFilter');
         if (!container) return;
@@ -4593,6 +4608,7 @@
             var checked = document.querySelectorAll('.pipeline-row-checkbox:checked');
             var count = checked.length;
             if (deleteBtnWrapper) deleteBtnWrapper.style.display = count > 0 ? 'inline-block' : 'none';
+            updateHomepageSelectedCount();
         }
         document.querySelectorAll('.pipeline-row-checkbox').forEach(function(cb) {
             cb.onchange = updateVisibility;
@@ -4968,6 +4984,7 @@
         var chk = document.getElementById('pipelineSelectAll');
         var cbs = document.querySelectorAll('.pipeline-row-checkbox');
         cbs.forEach(function(cb) { cb.checked = chk.checked; });
+        updateHomepageSelectedCount();
     }
 
     function getSelectedPipelineEmails() {
@@ -5007,7 +5024,6 @@
 
         updatePipelineStats();
         filterPipelineTable(false); // 重新筛选（保留当前页码，随后按页数收敛）
-        renderOverdueCards();
 
         // 保持在当前页，超出总页数则跳到最后一页
         var totalPages = Math.ceil(pipelineFiltered.length / pipelinePageSize) || 1;
@@ -5073,6 +5089,249 @@
         renderPipelineTable();
     }
 
+    // ========== 红人主页检查 ==========
+    var homepageCheckData = [];
+    var homepageCheckPage = 1;
+    var homepageCheckPageSize = 20;
+    var homepageCheckStop = false;
+
+    function updateHomepageSelectedCount() {
+        var el = document.getElementById('homepageSelectedCount');
+        if (!el) return;
+        el.textContent = document.querySelectorAll('.pipeline-row-checkbox:checked').length;
+    }
+
+    function getSelectedHomepageUsernames() {
+        var usernames = [];
+        var seen = {};
+        document.querySelectorAll('.pipeline-row-checkbox:checked').forEach(function(cb) {
+            var id = cb.getAttribute('data-id');
+            var item = null;
+            for (var i = 0; i < pipelineData.length; i++) {
+                if (pipelineData[i].id === id) { item = pipelineData[i]; break; }
+            }
+            var name = (item && item.name) ? String(item.name) : '';
+            name = name.trim().replace(/^@/, '').replace(/^https?:\/\//i, '').replace(/^(www\.)?instagram\.com\//i, '').replace(/\/+$/, '').trim();
+            if (!name) return;
+            var k = name.toLowerCase();
+            if (seen[k]) return;
+            seen[k] = true;
+            usernames.push(name);
+        });
+        return usernames;
+    }
+
+    function homepageHighlightWords() {
+        var input = document.getElementById('homepageHighlightWords');
+        var raw = input ? input.value : '';
+        return String(raw).split(',').map(function(w) { return w.trim().toLowerCase(); }).filter(function(w) { return w.length > 0; });
+    }
+
+    function homepageCaptionHtml(caption, words) {
+        var text = String(caption || '').replace(/\s+/g, ' ').trim();
+        if (!text) return '<span style="color:#94a3b8;">-</span>';
+        if (text.length > 180) text = text.slice(0, 180) + '…';
+        var esc = escHTML(text);
+        if (words && words.length) {
+            words.forEach(function(w) {
+                var re = new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+                esc = esc.replace(re, '<mark>$1</mark>');
+            });
+        }
+        return esc;
+    }
+
+    function renderHomepageCheckTable() {
+        var tbody = document.getElementById('homepageCheckBody');
+        if (!tbody) return;
+        var start = (homepageCheckPage - 1) * homepageCheckPageSize;
+        var pageData = homepageCheckData.slice(start, start + homepageCheckPageSize);
+        var words = homepageHighlightWords();
+        var html = '';
+        for (var i = 0; i < pageData.length; i++) {
+            var r = pageData[i];
+            var username = String(r.username || '');
+            var profileUrl = r.profileUrl || ('https://www.instagram.com/' + username + '/');
+            var tags = (Array.isArray(r.hashtags) ? r.hashtags : []).join(' ');
+            html += '<tr>' +
+                '<td><span class="copy-cell">' + escHTML(username) + '</span></td>' +
+                '<td>' + escHTML(r.lastPostDate || '-') + '</td>' +
+                '<td>' + (r.active ? '<span class="status-badge" style="background:#dcfce7;color:#166534;">✅ 活跃</span>' : '<span class="status-badge" style="background:#fef9c3;color:#854d0e;">⚠️ 不活跃</span>') + '</td>' +
+                '<td>' + homepageCaptionHtml(r.caption, words) + '</td>' +
+                '<td>' + escHTML(tags || '-') + '</td>' +
+                '<td><a href="' + escAttr(profileUrl) + '" target="_blank" rel="noopener" style="color:#4f46e5;">查看主页</a></td>' +
+                '</tr>';
+        }
+        if (pageData.length === 0) {
+            html = '<tr><td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">暂无检查结果</td></tr>';
+        }
+        tbody.innerHTML = html;
+        updateHomepageCheckPagination();
+    }
+
+    function updateHomepageCheckPagination() {
+        homepageCheckPage = refreshPaginationBar({
+            infoId: 'homepageCheckPageInfo',
+            numbersId: 'homepageCheckPageNumbers',
+            prevId: 'homepageCheckPrevBtn',
+            nextId: 'homepageCheckNextBtn',
+            gotoId: 'homepageCheckGotoPage',
+            page: homepageCheckPage,
+            size: homepageCheckPageSize,
+            total: homepageCheckData.length,
+            onPageClick: gotoHomepageCheckPage
+        });
+    }
+
+    function prevHomepageCheckPage() { if (homepageCheckPage > 1) { homepageCheckPage--; renderHomepageCheckTable(); } }
+    function nextHomepageCheckPage() {
+        var totalPages = Math.ceil(homepageCheckData.length / homepageCheckPageSize) || 1;
+        if (homepageCheckPage < totalPages) { homepageCheckPage++; renderHomepageCheckTable(); }
+    }
+    function gotoHomepageCheckPage(n) {
+        var totalPages = Math.ceil(homepageCheckData.length / homepageCheckPageSize) || 1;
+        var targetPage = parseInt(n, 10);
+        if (isNaN(targetPage)) return;
+        homepageCheckPage = Math.min(Math.max(1, targetPage), totalPages);
+        renderHomepageCheckTable();
+    }
+    function gotoHomepageCheckPageFromInput() {
+        var input = document.getElementById('homepageCheckGotoPage');
+        if (!input) return;
+        gotoHomepageCheckPage(input.value);
+        input.value = '';
+    }
+    function changeHomepageCheckPageSize() {
+        var sel = document.getElementById('homepageCheckPageSize');
+        homepageCheckPageSize = parseInt(sel.value, 10) || 20;
+        homepageCheckPage = 1;
+        renderHomepageCheckTable();
+    }
+
+    function loadHomepageCheck() {
+        fetch('/api/pipeline-check-homepage')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var map = (data && data.data && typeof data.data === 'object' && !Array.isArray(data.data)) ? data.data : {};
+                var arr = [];
+                Object.keys(map).forEach(function(k) { arr.push(map[k]); });
+                arr.sort(function(a, b) { return (b.lastPostTimestamp || 0) - (a.lastPostTimestamp || 0); });
+                homepageCheckData = arr;
+                renderHomepageCheckTable();
+            })
+            .catch(function(err) { console.error('加载主页检查结果失败:', err); });
+    }
+
+    function startHomepageCheck() {
+        var usernames = getSelectedHomepageUsernames();
+        if (usernames.length === 0) { alert('请先在寄样列表中勾选红人'); return; }
+        var daysRange = parseInt((document.getElementById('homepageDaysRange') || {}).value, 10) || 7;
+        var postsLimit = parseInt((document.getElementById('homepagePostsLimit') || {}).value, 10) || 10;
+        var highlightWords = (document.getElementById('homepageHighlightWords') || {}).value || '';
+
+        var btn = document.getElementById('homepageCheckBtn');
+        var stopBtn = document.getElementById('homepageStopBtn');
+        var statusEl = document.getElementById('homepageCheckStatus');
+        homepageCheckStop = false;
+        if (btn) btn.disabled = true;
+        if (stopBtn) stopBtn.style.display = 'inline-block';
+
+        var BATCH_SIZE = 20;
+        var batches = [];
+        for (var i = 0; i < usernames.length; i += BATCH_SIZE) batches.push(usernames.slice(i, i + BATCH_SIZE));
+        var allResults = [];
+        var failedBatches = [];
+        var startTime = Date.now();
+
+        function postBatch(batch) {
+            return fetch('/api/pipeline-check-homepage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernames: batch, daysRange: daysRange, postsLimit: postsLimit, highlightWords: highlightWords })
+            }).then(function(resp) { return resp.json(); });
+        }
+
+        function runNext(idx) {
+            if (homepageCheckStop) { finish(true); return; }
+            if (idx >= batches.length) { finish(false); return; }
+            var secs = Math.floor((Date.now() - startTime) / 1000);
+            statusEl.innerText = '检查中... 已完成 ' + idx + ' / ' + batches.length + '（共 ' + usernames.length + ' 个红人，已等待 ' + secs + ' 秒）';
+
+            postBatch(batches[idx]).then(function(data) {
+                if (homepageCheckStop) return;
+                if (data && data.success) {
+                    var list = Array.isArray(data.data) ? data.data : [];
+                    allResults = allResults.concat(list);
+                } else {
+                    failedBatches.push(idx + 1);
+                    console.warn('主页检查 批次 ' + (idx + 1) + ' 失败:', (data && data.error) || '未知错误');
+                }
+            }).catch(function(err) {
+                if (homepageCheckStop) return;
+                failedBatches.push(idx + 1);
+                console.error('主页检查 批次 ' + (idx + 1) + ' 请求异常:', err);
+            }).then(function() { runNext(idx + 1); });
+        }
+
+        function finish(stopped) {
+            if (stopBtn) stopBtn.style.display = 'none';
+            if (btn) btn.disabled = false;
+
+            var map = {};
+            homepageCheckData.forEach(function(r) { if (r && r.username) map[String(r.username).toLowerCase()] = r; });
+            allResults.forEach(function(r) { if (r && r.username) map[String(r.username).toLowerCase()] = r; });
+            var arr = [];
+            Object.keys(map).forEach(function(k) { arr.push(map[k]); });
+            arr.sort(function(a, b) { return (b.lastPostTimestamp || 0) - (a.lastPostTimestamp || 0); });
+            homepageCheckData = arr;
+            homepageCheckPage = 1;
+            renderHomepageCheckTable();
+
+            if (stopped) {
+                statusEl.innerText = '已停止，显示已完成的 ' + allResults.length + ' 个红人';
+            } else if (failedBatches.length > 0) {
+                statusEl.innerText = '检查完成 ' + (batches.length - failedBatches.length) + ' / ' + batches.length + ' 批；失败批次：' + failedBatches.join(', ');
+                showToast('有 ' + failedBatches.length + ' 批失败（批次 ' + failedBatches.join(', ') + '），其余已完成', 'warning');
+            } else {
+                var activeCount = allResults.filter(function(r) { return r.active; }).length;
+                statusEl.innerText = '检查完成：共 ' + usernames.length + ' 个红人，其中 ' + activeCount + ' 个近 7 天活跃';
+            }
+        }
+
+        runNext(0);
+    }
+
+    function exportHomepageCheckCsv() {
+        if (homepageCheckData.length === 0) { alert('暂无数据可导出'); return; }
+        var rows = [['红人ID', '最后发帖时间', '状态', '帖子文案', '帖子标签', '主页链接']];
+        homepageCheckData.forEach(function(r) {
+            rows.push([
+                r.username || '',
+                r.lastPostDate || '',
+                r.active ? '活跃' : '不活跃',
+                String(r.caption || '').replace(/\s+/g, ' ').trim(),
+                (Array.isArray(r.hashtags) ? r.hashtags : []).join(' '),
+                r.profileUrl || ('https://www.instagram.com/' + (r.username || '') + '/')
+            ]);
+        });
+        var csv = rows.map(function(row) {
+            return row.map(function(cell) {
+                var s = String(cell == null ? '' : cell);
+                if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+                return s;
+            }).join(',');
+        }).join('\n');
+        var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '红人主页检查.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     var pipelineEditingRow = null;
 
     function startPipelineEdit(id) {
@@ -5120,7 +5379,6 @@
         generatePipelineMonthOptions();
         updatePipelineStats();
         updateThisWeekStats();
-        renderOverdueCards();
         renderPipelineStatusFilter();
         filterPipelineTable(false);  // 保留当前页码（状态由 order-pending → sampling，需重新筛选）
         updateTodayActivity();
@@ -5252,7 +5510,6 @@
         // 刷新
         updatePipelineStats();
         updateThisWeekStats();
-        renderOverdueCards();
         renderPipelineStatusFilter();
         filterPipelineTable(false);
 
@@ -5314,7 +5571,6 @@
         generatePipelineMonthOptions();
         updatePipelineStats();
         updateThisWeekStats();
-        renderOverdueCards();
         renderPipelineStatusFilter();
         filterPipelineTable(false);  // 保留当前页码（编辑/改履约数量后重新筛选排序）
         syncPipelineToCD();
@@ -5344,7 +5600,6 @@
         updatePipelineStats();
         updateThisWeekStats();
         filterPipelineTable();
-        renderOverdueCards();
         if (typeof syncPipelineToCD === 'function') syncPipelineToCD();
     }
 
@@ -5377,7 +5632,6 @@
             savePipelineData();
             updatePipelineStats();
             updateThisWeekStats();
-            renderOverdueCards();
             filterPipelineTable();
             updateTodayActivity();
         }
@@ -6696,7 +6950,6 @@
 
         // 刷新 Pipeline 显示
         updatePipelineStats();
-        renderOverdueCards();
         filterPipelineTable();
 
         // 重置全选复选框
@@ -6889,7 +7142,6 @@
 
                 savePipelineData();
                 updatePipelineStats();
-                renderOverdueCards();
                 filterPipelineTable();
                 console.log('[删除] 同步清理 Pipeline 帖子:', removedCount, '条, 月份:', monthKey);
             }
@@ -7085,7 +7337,6 @@
         if (updatedCount > 0) {
             savePipelineData();
             updatePipelineStats();
-            renderOverdueCards();
             filterPipelineTable();
         }
         console.log('[C&D→Pipeline] 同步完成，更新了', updatedCount, '条 Pipeline 记录');

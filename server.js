@@ -19,6 +19,7 @@ const CD_DATA_FILE = path.join(__dirname, 'cd_data.json');
 const PAYMENT_DATA_FILE = path.join(__dirname, 'payment_data.json');
 const EMAIL_CONFIG_FILE = path.join(__dirname, 'email_config.json');
 const TOOLS_CONFIG_FILE = path.join(__dirname, 'tools_config.json');
+const HOMEPAGE_CHECK_FILE = path.join(__dirname, 'pipeline_homepage_check.json');
 
 // Apify 配置（凭证不入库，读取根目录 apify_config.json）
 let APIFY_TOKEN = '';
@@ -148,6 +149,120 @@ async function getApifyDatasetItems(datasetId) {
   const url = 'https://api.apify.com/v2/datasets/' + encodeURIComponent(datasetId) + '/items?token=' + encodeURIComponent(APIFY_TOKEN);
   const data = await apifyRequest(url, { method: 'GET' }, 120000);
   return Array.isArray(data) ? data : [];
+}
+
+// 同步跑一次 Apify actor 并直接返回数据集结果（run-sync-get-dataset-items，受 Apify 300 秒硬限制）
+function apifyRunSyncUrl(actorId) {
+  return 'https://api.apify.com/v2/acts/' + actorId + '/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN);
+}
+
+// 调一次 Apify（每步独立超时，token 打码打印请求体）
+async function callApify(actorId, apifyBody, label, timeoutMs) {
+  const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
+  console.log('[apify] %s 请求体: %s (token=%s)', label, JSON.stringify(apifyBody), maskedToken);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 290000);
+  try {
+    const resp = await fetch(apifyRunSyncUrl(actorId), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(apifyBody),
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error('[apify] %s Apify 非 200:', label, resp.status, text.slice(0, 300));
+      throw new Error('Apify HTTP ' + resp.status);
+    }
+    const data = await resp.json();
+    const items = Array.isArray(data) ? data : [];
+    console.log('[apify] %s 返回 %d 条', label, items.length);
+    return items;
+  } catch (err) {
+    clearTimeout(timer);
+    if (err && err.name === 'AbortError') throw new Error('Apify 请求超时（约 10 分钟）');
+    throw err;
+  }
+}
+
+// —— 红人主页检查辅助 ——
+function homeTimestamp(v) {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'number') return v > 1e12 ? v : v * 1000;
+  const t = new Date(v).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
+function homeFormatDate(ms) {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+// 抓一批账号的主页帖子，返回每个账号的检查结果
+async function checkHomepageBatch(usernames, daysRange, postsLimit) {
+  const APIFY_POST_ACTOR = 'apify~instagram-post-scraper';
+  const directUrls = usernames.map(function (u) { return 'https://www.instagram.com/' + u + '/'; });
+  const posts = await callApify(APIFY_POST_ACTOR, {
+    directUrls: directUrls,
+    resultsType: 'posts',
+    resultsLimit: postsLimit,
+    onlyPostsNewerThan: daysRange + ' days'
+  }, '主页检查', 300000);
+
+  // 按 owner username 分组（小写），并按帖子 url 去重
+  const byOwner = {};
+  const seenUrls = new Set();
+  (Array.isArray(posts) ? posts : []).forEach(function (p) {
+    if (!p || !p.url) return;
+    if (seenUrls.has(p.url)) return;
+    seenUrls.add(p.url);
+    let owner = String(p.ownerUsername || p.owner_username || p.ownerProfileUrl || '').trim();
+    if (owner.indexOf('instagram.com') !== -1) owner = owner.replace(/\/+$/, '').split('/').pop();
+    owner = owner.replace(/^@/, '').trim().toLowerCase();
+    if (!owner) return;
+    if (!byOwner[owner]) byOwner[owner] = [];
+    byOwner[owner].push(p);
+  });
+
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  return usernames.map(function (u) {
+    const key = String(u).replace(/^@/, '').toLowerCase();
+    const list = byOwner[key] || [];
+    let lastTs = 0;
+    let caption = '';
+    const hashtags = [];
+    const tagSet = new Set();
+    list.forEach(function (p) {
+      const ts = homeTimestamp(p.timestamp);
+      if (ts > lastTs) { lastTs = ts; caption = p.caption || ''; }
+      (Array.isArray(p.hashtags) ? p.hashtags : []).forEach(function (t) {
+        let tg = String(t).trim();
+        if (!tg) return;
+        if (tg.charAt(0) !== '#') tg = '#' + tg;
+        if (!tagSet.has(tg.toLowerCase())) { tagSet.add(tg.toLowerCase()); hashtags.push(tg); }
+      });
+      (String(p.caption || '').match(/#\w+/g) || []).forEach(function (t) {
+        if (!tagSet.has(t.toLowerCase())) { tagSet.add(t.toLowerCase()); hashtags.push(t); }
+      });
+    });
+    const lastPostDate = lastTs ? homeFormatDate(lastTs) : '';
+    const active = lastTs >= sevenDaysAgo && lastTs <= Date.now();
+    return {
+      username: u,
+      lastPostDate: lastPostDate,
+      lastPostTimestamp: lastTs,
+      active: active,
+      caption: caption,
+      hashtags: hashtags,
+      profileUrl: 'https://www.instagram.com/' + u + '/',
+      checkedAt: new Date().toISOString()
+    };
+  });
 }
 
 function createServer() {
@@ -391,6 +506,69 @@ function createServer() {
     return;
   }
 
+  // POST /api/pipeline-check-homepage — 批量抓取红人主页帖子，检查近期活跃
+  if (pathname === '/api/pipeline-check-homepage' && req.method === 'POST') {
+    parseBody(req).then(async (body) => {
+      try {
+        const usernames = [];
+        (Array.isArray(body.usernames) ? body.usernames : []).forEach(function (u) {
+          const name = String(u || '').trim().replace(/^@/, '').replace(/^https?:\/\//i, '').replace(/^(www\.)?instagram\.com\//i, '').replace(/\/+$/, '').trim();
+          if (!name) return;
+          if (usernames.some(function (x) { return x.toLowerCase() === name.toLowerCase(); })) return;
+          usernames.push(name);
+        });
+        if (usernames.length === 0) { sendJSON(res, 400, { success: false, error: '未提供用户名' }); return; }
+        if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token' }); return; }
+
+        const daysRange = parseInt(body.daysRange, 10) || 7;
+        const postsLimit = parseInt(body.postsLimit, 10) || 10;
+
+        // 分批（每批 20 个账号）
+        const BATCH = 20;
+        const allResults = [];
+        for (let i = 0; i < usernames.length; i += BATCH) {
+          const batch = usernames.slice(i, i + BATCH);
+          const batchResults = await checkHomepageBatch(batch, daysRange, postsLimit);
+          allResults.push.apply(allResults, batchResults);
+        }
+
+        // 合并进文件：覆盖本次已查，保留未查的旧数据
+        let existing = {};
+        try {
+          if (fs.existsSync(HOMEPAGE_CHECK_FILE)) {
+            const parsed = JSON.parse(fs.readFileSync(HOMEPAGE_CHECK_FILE, 'utf8'));
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) existing = parsed;
+          }
+        } catch (e) { existing = {}; }
+        allResults.forEach(function (r) { existing[r.username] = r; });
+        fs.writeFileSync(HOMEPAGE_CHECK_FILE, JSON.stringify(existing, null, 2));
+
+        console.log('[homepage-check] 检查 %d 个红人完成', allResults.length);
+        sendJSON(res, 200, { success: true, data: allResults });
+      } catch (err) {
+        console.error('[homepage-check] 错误:', err.message);
+        sendJSON(res, 500, { success: false, error: err.message || '检查失败' });
+      }
+    }).catch(err => sendJSON(res, 400, { error: err.message }));
+    return;
+  }
+
+  // GET /api/pipeline-check-homepage — 读取已存的主页检查结果
+  if (pathname === '/api/pipeline-check-homepage' && req.method === 'GET') {
+    try {
+      let data = {};
+      if (fs.existsSync(HOMEPAGE_CHECK_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(HOMEPAGE_CHECK_FILE, 'utf8'));
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) data = parsed;
+      }
+      sendJSON(res, 200, { success: true, data: data });
+    } catch (err) {
+      console.error('[homepage-check] GET error:', err.message);
+      sendJSON(res, 500, { success: false, error: err.message });
+    }
+    return;
+  }
+
   if (pathname === '/api/content-delivery' && req.method === 'GET') {
     try {
       if (fs.existsSync(CD_DATA_FILE)) {
@@ -503,43 +681,10 @@ function createServer() {
       if (searchType === 'batch' && batchUsernames.length === 0) { sendJSON(res, 400, { success: false, error: '请至少输入 1 个用户名' }); return; }
       if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token，请检查 apify_config.json' }); return; }
 
-      const maskedToken = APIFY_TOKEN ? 'apify_api_***' + APIFY_TOKEN.slice(-3) : '(无)';
       const APIFY_DETAILS_ACTOR = 'apify~instagram-scraper';
       const APIFY_HASHTAG_ACTOR = 'apify~instagram-hashtag-scraper';
       const APIFY_SIMILAR_ACTOR = 'zaver.api~instagram-similar-profiles-finder';
       const APIFY_PROFILE_ACTOR = 'apify~instagram-profile-scraper';
-      function apifyUrl(actorId) {
-        return 'https://api.apify.com/v2/acts/' + actorId + '/run-sync-get-dataset-items?token=' + encodeURIComponent(APIFY_TOKEN);
-      }
-
-      // 调一次 Apify（每步独立超时，token 打码打印请求体）
-      async function callApify(actorId, apifyBody, label, timeoutMs) {
-        console.log('[discovery-search] %s 请求体: %s (token=%s)', label, JSON.stringify(apifyBody), maskedToken);
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs || 290000);
-        try {
-          const resp = await fetch(apifyUrl(actorId), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(apifyBody),
-            signal: controller.signal
-          });
-          clearTimeout(timer);
-          if (!resp.ok) {
-            const text = await resp.text();
-            console.error('[discovery-search] %s Apify 非 200:', label, resp.status, text.slice(0, 300));
-            throw new Error('Apify HTTP ' + resp.status);
-          }
-          const data = await resp.json();
-          const items = Array.isArray(data) ? data : [];
-          console.log('[discovery-search] %s 返回 %d 条', label, items.length);
-          return items;
-        } catch (err) {
-          clearTimeout(timer);
-          if (err && err.name === 'AbortError') throw new Error('Apify 请求超时（约 10 分钟）');
-          throw err;
-        }
-      }
 
       try {
         let profiles = []; // 最终返回的账号详情数组

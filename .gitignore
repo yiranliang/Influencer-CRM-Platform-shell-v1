@@ -20,6 +20,7 @@ screenshots/
 *.log
 backups/
 discovery_history.json
+pipeline_homepage_check.json
 
 # ========== 编辑器 / AI 工具 ==========
 .claude/
