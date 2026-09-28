@@ -205,9 +205,8 @@ function homeFormatDate(ms) {
 // 抓一批账号的主页帖子，返回每个账号的检查结果
 async function checkHomepageBatch(usernames, daysRange, postsLimit) {
   const APIFY_POST_ACTOR = 'apify~instagram-profile-scraper';
-  const directUrls = usernames.map(function (u) { return 'https://www.instagram.com/' + u + '/'; });
   const posts = await callApify(APIFY_POST_ACTOR, {
-    directUrls: directUrls,
+    usernames: usernames,
     resultsType: 'posts',
     resultsLimit: postsLimit,
     onlyPostsNewerThan: daysRange + ' days'
