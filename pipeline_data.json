@@ -3,7 +3,7 @@
     "email": "brettdaniellestyle@gmail.com",
     "name": "brettdaniellestyle",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 7,
     "postedQty": 0,
     "pendingQty": 7,
@@ -35,7 +35,7 @@
     "email": "laurashhans@gmail.com",
     "name": "laurenashleyhansen",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 7,
     "postedQty": 0,
     "pendingQty": 7,
@@ -67,7 +67,7 @@
     "email": "advertise@daisijoreviews.com",
     "name": "daisijoreviews",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 15,
     "postedQty": 0,
     "pendingQty": 15,
@@ -99,7 +99,7 @@
     "email": "austynryli@allaboutaustyn.com",
     "name": "all_about_austyn",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 9,
     "postedQty": 0,
     "pendingQty": 9,
@@ -131,7 +131,7 @@
     "email": "Taylored.nutritionn@gmail.com",
     "name": "taylored.nutrition",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 5,
     "postedQty": 0,
     "pendingQty": 5,
@@ -163,7 +163,7 @@
     "email": "tallandchardonnay@gmail.com",
     "name": "nickiehworth",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 4,
     "postedQty": 0,
     "pendingQty": 4,
@@ -195,7 +195,7 @@
     "email": "chelseaddelgado@gmail.com",
     "name": "chelseadelgado",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 11,
     "postedQty": 0,
     "pendingQty": 11,
@@ -227,7 +227,7 @@
     "email": "katie@wanderabode.com",
     "name": "wanderabode",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 5,
     "postedQty": 0,
     "pendingQty": 5,
@@ -259,7 +259,7 @@
     "email": "marinaibrahim280@gmail.com",
     "name": "dress_up_with_marina",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 6,
     "postedQty": 0,
     "pendingQty": 6,
@@ -291,7 +291,7 @@
     "email": "wearwithnidhi@gmail.com",
     "name": "wearwithnidhi",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 8,
     "postedQty": 0,
     "pendingQty": 8,
@@ -315,7 +315,7 @@
     "email": "IG@lacewagnon",
     "name": "lacewagnon",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 9,
     "postedQty": 0,
     "pendingQty": 9,
@@ -360,7 +360,7 @@
     "totalFulfilledQty": 0,
     "id": "pipe_1781163112798_c7ag8tye",
     "pipelineNote": "",
-    "overdueDays": 106,
+    "overdueDays": 109,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -402,7 +402,7 @@
     "email": "getreadywithalip@gmail.com",
     "name": "get_ready_with_ali",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 5,
     "postedQty": 0,
     "pendingQty": 5,
@@ -434,7 +434,7 @@
     "email": "karanicolesmit@gmail.com",
     "name": "itskaranicolee",
     "channel": "Tiktok",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 6,
     "postedQty": 0,
     "pendingQty": 6,
@@ -498,7 +498,7 @@
     "email": "Collaborationjenny@gmail.com",
     "name": "jennymarquez_x3",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "posted",
     "sampleQty": 7,
     "postedQty": 0,
     "pendingQty": 7,
@@ -763,8 +763,8 @@
     "pipelineNote": "付费红人",
     "overdueDays": 15,
     "archived": false,
-    "fulfilledQty": 1,
-    "isFullyFulfilled": false,
+    "fulfilledQty": 9,
+    "isFullyFulfilled": true,
     "favorited": false
   },
   {
@@ -851,9 +851,10 @@
     "pipelineNote": "",
     "overdueDays": 14,
     "archived": false,
-    "fulfilledQty": 0,
-    "isFullyFulfilled": false,
-    "favorited": false
+    "fulfilledQty": 4,
+    "isFullyFulfilled": true,
+    "favorited": false,
+    "brand": ""
   },
   {
     "email": "zilimonika1@gmail.com",
@@ -907,9 +908,10 @@
     "pipelineNote": "",
     "overdueDays": 13,
     "archived": false,
-    "fulfilledQty": 0,
+    "fulfilledQty": 1,
     "isFullyFulfilled": false,
-    "favorited": false
+    "favorited": false,
+    "brand": ""
   },
   {
     "email": "stephcelestlo@gmail.com",
@@ -1153,7 +1155,7 @@
     "totalFulfilledQty": 0,
     "id": "pipe_1781163112798_fwyem47n",
     "pipelineNote": "",
-    "overdueDays": 94,
+    "overdueDays": 97,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -1840,7 +1842,7 @@
     "totalFulfilledQty": 0,
     "id": "pipe_1781163112798_h4h8s7an",
     "pipelineNote": "",
-    "overdueDays": 86,
+    "overdueDays": 89,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2013,7 +2015,7 @@
     "totalFulfilledQty": 0,
     "id": "pipe_1781163112798_gwdjwsoq",
     "pipelineNote": "",
-    "overdueDays": 85,
+    "overdueDays": 88,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2033,7 +2035,7 @@
     "totalFulfilledQty": 0,
     "id": "pipe_1781163112798_ps4w03uf",
     "pipelineNote": "",
-    "overdueDays": 85,
+    "overdueDays": 88,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2091,7 +2093,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "",
-    "overdueDays": 84,
+    "overdueDays": 87,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2156,7 +2158,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "旅游型博主",
-    "overdueDays": 81,
+    "overdueDays": 84,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2468,7 +2470,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "生活vlog型红人",
-    "overdueDays": 74,
+    "overdueDays": 77,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2488,7 +2490,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "印度人 不用看了",
-    "overdueDays": 74,
+    "overdueDays": 77,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2628,7 +2630,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "最近数据很差",
-    "overdueDays": 70,
+    "overdueDays": 73,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2648,7 +2650,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "有3件缺货不知道能不能寄出去",
-    "overdueDays": 70,
+    "overdueDays": 73,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2722,7 +2724,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "生活vlog型红人",
-    "overdueDays": 70,
+    "overdueDays": 73,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2742,7 +2744,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "想要付费",
-    "overdueDays": 67,
+    "overdueDays": 70,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -2781,7 +2783,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "改名了",
-    "overdueDays": 65,
+    "overdueDays": 68,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -3188,7 +3190,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "",
-    "overdueDays": 57,
+    "overdueDays": 60,
     "archived": false,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -3248,7 +3250,7 @@
     "posts": [],
     "totalFulfilledQty": 0,
     "pipelineNote": "",
-    "overdueDays": 57,
+    "overdueDays": 60,
     "archived": true,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
@@ -3517,7 +3519,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "",
     "archived": true,
-    "overdueDays": 56,
+    "overdueDays": 59,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -3651,7 +3653,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "",
     "archived": true,
-    "overdueDays": 53,
+    "overdueDays": 56,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -3671,7 +3673,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "",
     "archived": false,
-    "overdueDays": 53,
+    "overdueDays": 56,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -3879,7 +3881,7 @@
     "totalFulfilledQty": 7,
     "pipelineNote": "",
     "archived": true,
-    "overdueDays": 52,
+    "overdueDays": 55,
     "fulfilledQty": 7,
     "isFullyFulfilled": true,
     "favorited": false
@@ -3938,7 +3940,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "",
     "archived": true,
-    "overdueDays": 50,
+    "overdueDays": 53,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -4154,7 +4156,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "发在tk上",
     "archived": false,
-    "overdueDays": 43,
+    "overdueDays": 46,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -4174,7 +4176,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "",
     "archived": false,
-    "overdueDays": 43,
+    "overdueDays": 46,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -4260,7 +4262,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "有一件缺货 跟进一下",
     "archived": false,
-    "overdueDays": 42,
+    "overdueDays": 45,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -4407,7 +4409,7 @@
     "totalFulfilledQty": 0,
     "pipelineNote": "改名了",
     "archived": true,
-    "overdueDays": 39,
+    "overdueDays": 42,
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "favorited": false
@@ -4709,7 +4711,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 29,
+    "overdueDays": 32,
     "favorited": false
   },
   {
@@ -4965,7 +4967,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 29,
+    "overdueDays": 32,
     "favorited": false
   },
   {
@@ -4985,7 +4987,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 29,
+    "overdueDays": 32,
     "favorited": false
   },
   {
@@ -5208,7 +5210,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 29,
+    "overdueDays": 32,
     "favorited": false
   },
   {
@@ -5333,7 +5335,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 29,
+    "overdueDays": 32,
     "favorited": false
   },
   {
@@ -5399,7 +5401,7 @@
     "pipelineNote": "改名了",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5419,7 +5421,7 @@
     "pipelineNote": "改名了",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5485,7 +5487,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5505,7 +5507,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5597,7 +5599,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5617,7 +5619,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5637,7 +5639,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5657,7 +5659,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5677,7 +5679,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5749,7 +5751,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5821,7 +5823,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -5933,7 +5935,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 28,
+    "overdueDays": 31,
     "favorited": false
   },
   {
@@ -6057,7 +6059,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 25,
+    "overdueDays": 28,
     "favorited": false
   },
   {
@@ -6077,7 +6079,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 25,
+    "overdueDays": 28,
     "favorited": false
   },
   {
@@ -6137,7 +6139,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 25,
+    "overdueDays": 28,
     "favorited": false
   },
   {
@@ -6158,7 +6160,7 @@
     "fulfilledQty": 2,
     "isFullyFulfilled": false,
     "overdueDays": 10,
-    "favorited": false
+    "favorited": true
   },
   {
     "id": "pipe_1786333245856_nc69xlsh",
@@ -6177,7 +6179,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 25,
+    "overdueDays": 28,
     "favorited": false
   },
   {
@@ -6263,7 +6265,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 25,
+    "overdueDays": 28,
     "favorited": false
   },
   {
@@ -6433,7 +6435,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 24,
+    "overdueDays": 27,
     "favorited": false
   },
   {
@@ -6479,7 +6481,7 @@
     "pipelineNote": "带单红人",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 24,
+    "overdueDays": 27,
     "favorited": false
   },
   {
@@ -6585,7 +6587,7 @@
     "pipelineNote": "kourts_petiteperspective",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 23,
+    "overdueDays": 26,
     "favorited": false
   },
   {
@@ -6605,7 +6607,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 23,
+    "overdueDays": 26,
     "favorited": false
   },
   {
@@ -6703,7 +6705,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 22,
+    "overdueDays": 25,
     "favorited": false
   },
   {
@@ -6749,7 +6751,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 21,
+    "overdueDays": 24,
     "favorited": false
   },
   {
@@ -6769,7 +6771,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 21,
+    "overdueDays": 24,
     "favorited": false
   },
   {
@@ -6808,7 +6810,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 21,
+    "overdueDays": 24,
     "favorited": false
   },
   {
@@ -6828,7 +6830,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 21,
+    "overdueDays": 24,
     "favorited": false
   },
   {
@@ -6848,7 +6850,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 21,
+    "overdueDays": 24,
     "favorited": false
   },
   {
@@ -6868,7 +6870,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 21,
+    "overdueDays": 24,
     "favorited": false
   },
   {
@@ -6914,7 +6916,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 18,
+    "overdueDays": 21,
     "favorited": false
   },
   {
@@ -6974,7 +6976,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 18,
+    "overdueDays": 21,
     "favorited": false
   },
   {
@@ -7106,7 +7108,7 @@
     "pipelineNote": "付费红人",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 17,
+    "overdueDays": 20,
     "favorited": false
   },
   {
@@ -7126,7 +7128,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 17,
+    "overdueDays": 20,
     "favorited": false
   },
   {
@@ -7146,7 +7148,7 @@
     "pipelineNote": "改名了",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 17,
+    "overdueDays": 20,
     "favorited": false
   },
   {
@@ -7186,7 +7188,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 17,
+    "overdueDays": 20,
     "favorited": false
   },
   {
@@ -7246,7 +7248,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 17,
+    "overdueDays": 20,
     "favorited": false
   },
   {
@@ -7286,7 +7288,7 @@
     "pipelineNote": "赞助礼包活动",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 17,
+    "overdueDays": 20,
     "favorited": false
   },
   {
@@ -7306,7 +7308,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 16,
+    "overdueDays": 19,
     "favorited": false
   },
   {
@@ -7326,7 +7328,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 16,
+    "overdueDays": 19,
     "favorited": false
   },
   {
@@ -7346,7 +7348,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 16,
+    "overdueDays": 19,
     "favorited": false
   },
   {
@@ -7392,7 +7394,7 @@
     "pipelineNote": "发在story",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 16,
+    "overdueDays": 19,
     "favorited": false
   },
   {
@@ -7438,7 +7440,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 15,
+    "overdueDays": 18,
     "favorited": false
   },
   {
@@ -7497,7 +7499,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 15,
+    "overdueDays": 18,
     "favorited": false
   },
   {
@@ -7555,7 +7557,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 14,
+    "overdueDays": 17,
     "favorited": false
   },
   {
@@ -7595,7 +7597,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 14,
+    "overdueDays": 17,
     "favorited": false
   },
   {
@@ -7615,7 +7617,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 14,
+    "overdueDays": 17,
     "favorited": false
   },
   {
@@ -7635,7 +7637,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 11,
+    "overdueDays": 14,
     "favorited": false
   },
   {
@@ -7655,7 +7657,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 11,
+    "overdueDays": 14,
     "favorited": false
   },
   {
@@ -7740,7 +7742,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 11,
+    "overdueDays": 14,
     "favorited": false
   },
   {
@@ -7760,7 +7762,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 11,
+    "overdueDays": 14,
     "favorited": false
   },
   {
@@ -7780,7 +7782,7 @@
     "pipelineNote": "",
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
-    "overdueDays": 11,
+    "overdueDays": 14,
     "favorited": false
   },
   {
@@ -7819,7 +7821,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "overdueDays": 10,
+    "overdueDays": 13,
     "favorited": false
   },
   {
@@ -7858,7 +7860,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "overdueDays": 10,
+    "overdueDays": 13,
     "favorited": false
   },
   {
@@ -7878,7 +7880,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "overdueDays": 10,
+    "overdueDays": 13,
     "favorited": false
   },
   {
@@ -7898,7 +7900,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "overdueDays": 10,
+    "overdueDays": 13,
     "favorited": false
   },
   {
@@ -7938,7 +7940,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "S级红人",
-    "overdueDays": 10,
+    "overdueDays": 13,
     "favorited": true
   },
   {
@@ -7977,7 +7979,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "overdueDays": 9,
+    "overdueDays": 12,
     "favorited": false
   },
   {
@@ -8037,7 +8039,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "overdueDays": 8,
+    "overdueDays": 11,
     "favorited": false
   },
   {
@@ -8057,7 +8059,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "overdueDays": 8,
+    "overdueDays": 11,
     "favorited": false
   },
   {
@@ -8097,7 +8099,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 7
+    "overdueDays": 10
   },
   {
     "id": "pipe_1787881715377_e06vfhwz",
@@ -8136,7 +8138,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 7
+    "overdueDays": 10
   },
   {
     "id": "pipe_1787884637710_u9jmn213",
@@ -8156,7 +8158,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 7
+    "overdueDays": 10
   },
   {
     "id": "pipe_1787535594091_yf0dcmq9",
@@ -8195,7 +8197,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 7
+    "overdueDays": 10
   },
   {
     "id": "pipe_1788141630113_86com5rp",
@@ -8215,7 +8217,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 4
+    "overdueDays": 7
   },
   {
     "id": "pipe_1788142720101_nkfban4f",
@@ -8235,7 +8237,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 4
+    "overdueDays": 7
   },
   {
     "id": "pipe_1788143064493_601keeaf",
@@ -8255,7 +8257,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 4
+    "overdueDays": 7
   },
   {
     "id": "pipe_1788143231597_whpskdu1",
@@ -8294,7 +8296,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 4
+    "overdueDays": 7
   },
   {
     "id": "pipe_1788155966002_gimrcklc",
@@ -8314,7 +8316,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 4
+    "overdueDays": 7
   },
   {
     "id": "pipe_1788156347462_95nymy40",
@@ -8334,7 +8336,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 4
+    "overdueDays": 7
   },
   {
     "id": "pipe_1788156925023_hsxfinqn",
@@ -8354,7 +8356,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 4
+    "overdueDays": 7
   },
   {
     "id": "pipe_1788316575502_7ecy62ve",
@@ -8374,7 +8376,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788317721526_0mtgsk5q",
@@ -8394,7 +8396,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788318012692_obuopefw",
@@ -8414,7 +8416,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788318390803_chbkp1o7",
@@ -8434,7 +8436,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788318516170_zw4awii9",
@@ -8454,7 +8456,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788318876298_3stg0xro",
@@ -8474,7 +8476,7 @@
     "archived": false,
     "pipelineNote": "PD寄样9.24",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788319101723_o9kfgvzx",
@@ -8494,7 +8496,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788327151723_c4khueru",
@@ -8514,7 +8516,7 @@
     "archived": false,
     "pipelineNote": "",
     "favorited": false,
-    "overdueDays": 2
+    "overdueDays": 5
   },
   {
     "id": "pipe_1788752278313_uhcr6jy0",
@@ -8522,14 +8524,14 @@
     "name": "she_teaches_fits",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "delivered",
+    "status": "partial-posted",
     "sampleQty": 20,
     "sampleDate": "2026/09/07",
     "samplingStartDate": "2026/09/07",
     "deliveredDate": "2026/09/14",
     "posts": [],
     "totalFulfilledQty": 0,
-    "fulfilledQty": 0,
+    "fulfilledQty": 1,
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "PD寄样9.23",
@@ -9188,7 +9190,7 @@
     "brand": "Saodimallsu",
     "channel": "Instagram",
     "status": "delivered",
-    "sampleQty": 8,
+    "sampleQty": 17,
     "sampleDate": "2026/09/07",
     "samplingStartDate": "2026/09/07",
     "deliveredDate": "2026/09/14",
@@ -9197,7 +9199,7 @@
     "fulfilledQty": 0,
     "isFullyFulfilled": false,
     "archived": false,
-    "pipelineNote": "",
+    "pipelineNote": "PD 9.28",
     "favorited": false
   },
   {
@@ -9445,7 +9447,7 @@
     "isFullyFulfilled": false,
     "archived": false,
     "pipelineNote": "",
-    "favorited": false
+    "favorited": true
   },
   {
     "id": "pipe_1788920128835_716j2uel",
@@ -10776,5 +10778,99 @@
     "archived": false,
     "favorited": false,
     "pipelineNote": "PD"
+  },
+  {
+    "id": "pipe_1790573894944_rl2cz2c6",
+    "email": "nneka@queenofsleeves.com",
+    "name": "queenofsleeves",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "status": "order-pending",
+    "sampleQty": 0,
+    "sampleDate": "",
+    "samplingStartDate": "",
+    "deliveredDate": "",
+    "posts": [],
+    "totalFulfilledQty": 0,
+    "fulfilledQty": 0,
+    "isFullyFulfilled": false,
+    "archived": false,
+    "favorited": false,
+    "pipelineNote": ""
+  },
+  {
+    "id": "pipe_1790573977324_m4ytw2jo",
+    "email": "Gauri.baitule@yahoo.com",
+    "name": "gauri_baitule69",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "status": "order-pending",
+    "sampleQty": 0,
+    "sampleDate": "",
+    "samplingStartDate": "",
+    "deliveredDate": "",
+    "posts": [],
+    "totalFulfilledQty": 0,
+    "fulfilledQty": 0,
+    "isFullyFulfilled": false,
+    "archived": false,
+    "favorited": false,
+    "pipelineNote": ""
+  },
+  {
+    "id": "pipe_1790578100524_z6d6mqed",
+    "email": "brittanywhealon@gmail.com",
+    "name": "brittanywhealon",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "status": "order-pending",
+    "sampleQty": 0,
+    "sampleDate": "",
+    "samplingStartDate": "",
+    "deliveredDate": "",
+    "posts": [],
+    "totalFulfilledQty": 0,
+    "fulfilledQty": 0,
+    "isFullyFulfilled": false,
+    "archived": false,
+    "favorited": false,
+    "pipelineNote": ""
+  },
+  {
+    "id": "pipe_1790579290851_b4xylo9b",
+    "email": "vbcaron@gmail.com",
+    "name": "veramcaron",
+    "brand": "Saodimallsu",
+    "channel": "Instagram",
+    "status": "order-pending",
+    "sampleQty": 0,
+    "sampleDate": "",
+    "samplingStartDate": "",
+    "deliveredDate": "",
+    "posts": [],
+    "totalFulfilledQty": 0,
+    "fulfilledQty": 0,
+    "isFullyFulfilled": false,
+    "archived": false,
+    "favorited": false,
+    "pipelineNote": ""
+  },
+  {
+    "id": "pipe_1790579349251_sjzpy765",
+    "email": "brookie@brookiescookiesco.com",
+    "name": "hellobrookiecookie",
+    "brand": "Aoysky",
+    "channel": "Instagram",
+    "status": "order-pending",
+    "sampleQty": 0,
+    "sampleDate": "",
+    "samplingStartDate": "",
+    "deliveredDate": "",
+    "posts": [],
+    "totalFulfilledQty": 0,
+    "fulfilledQty": 0,
+    "isFullyFulfilled": false,
+    "archived": false,
+    "favorited": false
   }
 ]

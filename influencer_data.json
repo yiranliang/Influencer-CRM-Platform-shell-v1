@@ -2436,7 +2436,7 @@
     "email": "Gauri.baitule@yahoo.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "posted",
+    "status": "order-pending",
     "note": "复用",
     "id": "1781148559417_256_Gauri.baitule@yahoo.com",
     "favorited": false
@@ -2678,7 +2678,7 @@
     "email": "vbcaron@gmail.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "order-pending",
     "note": "",
     "id": "1781148559417_278_vbcaron@gmail.com",
     "favorited": false
@@ -4449,7 +4449,7 @@
     "email": "dranushkachandan@gmail.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "partial-posted",
+    "status": "order-pending",
     "note": "",
     "id": "1781148559417_449_dranushkachandan@gmail.com",
     "favorited": false
@@ -13194,7 +13194,7 @@
     "email": "samanthafvanderpool@gmail.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "order-pending",
+    "status": "partial-posted",
     "note": "",
     "id": "1781148559417_2359_samanthafvanderpool@gmail.com",
     "favorited": false
@@ -14592,7 +14592,7 @@
     "brand": "Saodimallsu",
     "channel": "Instagram",
     "note": "",
-    "status": "partial-posted",
+    "status": "posted",
     "date": "2026/05/16",
     "favorited": false
   },
@@ -18188,7 +18188,7 @@
     "email": "sheteachesfifth@gmail.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "order-pending",
+    "status": "partial-posted",
     "note": "",
     "id": "1781148559418_4340_sheteachesfifth@gmail.com",
     "favorited": false
@@ -47556,7 +47556,7 @@
     "email": "nneka@queenofsleeves.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "Confirm",
+    "status": "order-pending",
     "note": "",
     "id": "1781148559415_50_nneka@a-listme.com",
     "favorited": false
@@ -52913,7 +52913,7 @@
     "email": "anne@styledfloridian.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "order-pending",
+    "status": "Connected",
     "note": "",
     "id": "1781148559417_2346_anne@styledfloridian.com",
     "favorited": false
@@ -54409,7 +54409,7 @@
     "email": "brittanywhealon@gmail.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "Connected",
+    "status": "order-pending",
     "note": "",
     "id": "1781148559417_2505_brittanywhealon@gmail.com",
     "favorited": false
@@ -57214,8 +57214,8 @@
     "email": "baileestewart2223@gmail.com",
     "brand": "Saodimallsu",
     "channel": "Instagram",
-    "status": "Connected",
-    "note": "",
+    "status": "Reject",
+    "note": "UGC 只接受付费",
     "id": "1781148559417_2718_baileestewart2223@gmail.com",
     "favorited": false
   },
@@ -57622,7 +57622,7 @@
     "brand": "Aoysky",
     "channel": "Instagram",
     "note": "",
-    "status": "Connected",
+    "status": "Confirm",
     "date": "2026/09/27",
     "favorited": false
   },
@@ -58205,7 +58205,7 @@
     "brand": "Aoysky",
     "channel": "Instagram",
     "note": "",
-    "status": "Connected",
+    "status": "order-pending",
     "date": "2026/09/27",
     "favorited": false
   },
@@ -58614,6 +58614,17 @@
     "note": "",
     "status": "Connected",
     "date": "2026/09/27",
+    "favorited": false
+  },
+  {
+    "date": "2026/09/28",
+    "name": "lincolnsmamaaa",
+    "email": "arielgottfried@gmail.com",
+    "brand": "",
+    "channel": "Instagram",
+    "status": "Connected",
+    "note": "粉丝: 419434 | 分类:  | 来源: im_lola__",
+    "id": "1790564472970_fbtjn6yq_lincolnsmamaaa",
     "favorited": false
   }
 ]
