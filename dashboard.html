@@ -1043,6 +1043,7 @@
         }
 
         /* 红人主页检查表格（独立列宽，避免与寄样列表的 nth-child 规则冲突） */
+        .homepage-check-table-container { height: auto; overflow-y: visible; }
         .homepage-check-table { width: 100%; min-width: 560px; table-layout: fixed; border-collapse: collapse; }
         .homepage-check-table thead { position: sticky; top: 0; z-index: 5; }
         .homepage-check-table thead th { background: #f8fafc; border-bottom: 2px solid #e9eef3; padding: 10px 8px; font-size: 13px; font-weight: 600; text-align: left; }
@@ -1917,7 +1918,7 @@
                     </div>
                 </div>
                 <div id="homepageCheckStatus" style="font-size:13px;color:#64748b;margin:6px 0;"></div>
-                <div class="pipeline-table-container">
+                <div class="pipeline-table-container homepage-check-table-container">
                     <table class="homepage-check-table"><thead><tr>
                         <th></th><th>红人ID</th><th>最后发帖时间</th><th>状态</th><th>操作</th>
                     </tr></thead>
