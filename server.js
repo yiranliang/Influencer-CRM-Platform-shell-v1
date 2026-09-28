@@ -203,15 +203,20 @@ function homeFormatDate(ms) {
 }
 
 // 抓一批账号的主页帖子，返回每个账号的检查结果
-async function checkHomepageBatch(usernames, daysRange, postsLimit) {
+async function checkHomepageBatch(usernames, mode, daysRange, postsLimit) {
   const APIFY_POST_ACTOR = 'apify~instagram-scraper';
   const directUrls = usernames.map(function (u) { return 'https://www.instagram.com/' + u + '/'; });
-  const posts = await callApify(APIFY_POST_ACTOR, {
-    directUrls: directUrls,
-    resultsType: 'posts',
-    resultsLimit: postsLimit,
-    onlyPostsNewerThan: daysRange + ' days'
-  }, '主页检查', 300000);
+  // 按模式组装参数：time=仅时间, count=仅数量, both=两者都传
+  const apifyBody = { directUrls: directUrls, resultsType: 'posts' };
+  if (mode === 'count') {
+    apifyBody.resultsLimit = postsLimit;
+  } else if (mode === 'both') {
+    apifyBody.resultsLimit = postsLimit;
+    apifyBody.onlyPostsNewerThan = daysRange + ' days';
+  } else {
+    apifyBody.onlyPostsNewerThan = daysRange + ' days';
+  }
+  const posts = await callApify(APIFY_POST_ACTOR, apifyBody, '主页检查', 300000);
 
   // 按 owner username 分组（小写），并按帖子 url 去重
   const byOwner = {};
@@ -532,15 +537,16 @@ function createServer() {
         if (usernames.length === 0) { sendJSON(res, 400, { success: false, error: '未提供用户名' }); return; }
         if (!APIFY_TOKEN) { sendJSON(res, 400, { success: false, error: '未配置 Apify Token' }); return; }
 
-        const daysRange = parseInt(body.daysRange, 10) || 7;
-        const postsLimit = parseInt(body.postsLimit, 10) || 10;
+        const mode = (body.mode === 'count' || body.mode === 'both') ? body.mode : 'time';
+        const daysRange = Math.max(1, Math.min(365, parseInt(body.daysRange, 10) || 7));
+        const postsLimit = Math.max(1, Math.min(100, parseInt(body.postsLimit, 10) || 10));
 
         // 分批（每批 20 个账号）
         const BATCH = 20;
         const allResults = [];
         for (let i = 0; i < usernames.length; i += BATCH) {
           const batch = usernames.slice(i, i + BATCH);
-          const batchResults = await checkHomepageBatch(batch, daysRange, postsLimit);
+          const batchResults = await checkHomepageBatch(batch, mode, daysRange, postsLimit);
           allResults.push.apply(allResults, batchResults);
         }
 

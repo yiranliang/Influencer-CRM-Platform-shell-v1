@@ -1064,7 +1064,10 @@
         .homepage-detail-table th { background: #f1f5f9; padding: 6px 8px; text-align: left; font-weight: 500; border-bottom: 1px solid #e2e8f0; }
         .homepage-detail-table td { padding: 6px 8px; border-bottom: 1px solid #e9eef3; vertical-align: top; }
         .homepage-detail-table th:nth-child(1) { width: 120px; }
-        .homepage-detail-table th:nth-child(3) { width: 180px; }
+        .homepage-detail-table th:nth-child(3) { width: 160px; }
+        .homepage-detail-table th:nth-child(4), .homepage-detail-table td:nth-child(4) { width: 60px; text-align: center; }
+        .homepage-post-link { color: #2563eb; text-decoration: none; font-weight: 500; }
+        .homepage-post-link:hover { text-decoration: underline; }
 
         /* 文案截断 + tooltip（深色背景、白字、圆角） */
         .homepage-caption { position: relative; cursor: help; display: inline-block; max-width: 100%; vertical-align: middle; }
@@ -1879,6 +1882,13 @@
                         <span style="font-size:13px;color:#475569;">已勾选 <strong id="homepageSelectedCount" style="color:#4f46e5;">0</strong> 个红人（在寄样列表中勾选）</span>
                     </div>
                     <div class="toolbar-right" style="gap:10px;align-items:center;flex-wrap:wrap;">
+                        <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">模式
+                            <select id="homepageMode" onchange="onHomepageModeChange()" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                                <option value="time" selected>时间模式</option>
+                                <option value="count">数量模式</option>
+                                <option value="both">两者模式</option>
+                            </select>
+                        </label>
                         <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">时间范围
                             <select id="homepageDaysRange" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
                                 <option value="7" selected>近 7 天</option>
@@ -1887,11 +1897,14 @@
                             </select>
                         </label>
                         <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">抓取数量
-                            <select id="homepagePostsLimit" style="padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
-                                <option value="10" selected>每主页 10 条</option>
-                                <option value="5">每主页 5 条</option>
-                                <option value="3">每主页 3 条</option>
-                            </select>
+                            <input type="number" id="homepagePostsLimit" list="homepagePostsLimitOptions" value="10" min="1" max="100" step="1" style="width:84px;padding:4px 6px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                            <datalist id="homepagePostsLimitOptions">
+                                <option value="3"></option>
+                                <option value="5"></option>
+                                <option value="10"></option>
+                                <option value="20"></option>
+                                <option value="50"></option>
+                            </datalist>
                         </label>
                         <label style="font-size:13px;color:#475569;display:flex;align-items:center;gap:4px;">高亮词
                             <input type="text" id="homepageHighlightWords" value="amazon, comment, link, shop, code, discount" style="width:220px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
@@ -4485,6 +4498,7 @@
             updatePipelineStats();
             updateThisWeekStats();
             loadHomepageCheck();
+            onHomepageModeChange();
             renderPipelineStatusFilter();
             filterPipelineTable();
             updateTodayActivity();
@@ -5247,14 +5261,16 @@
         var words = homepageHighlightWords();
         var html = '<tr class="homepage-detail-row" id="' + detailId + '"><td colspan="5">' +
             '<table class="homepage-detail-table"><thead><tr>' +
-            '<th>发帖时间</th><th>文案</th><th>标签</th>' +
+            '<th>发帖时间</th><th>文案</th><th>标签</th><th>链接</th>' +
             '</tr></thead><tbody>';
         posts.forEach(function(p) {
             var tags = (Array.isArray(p.hashtags) ? p.hashtags : []).join(' ');
+            var url = p.url ? String(p.url) : '';
             html += '<tr>' +
                 '<td>' + escHTML(p.date || '-') + '</td>' +
                 '<td>' + homepageCaptionCell(p.caption, words) + '</td>' +
                 '<td>' + escHTML(tags || '-') + '</td>' +
+                '<td>' + (url ? '<a class="homepage-post-link" href="' + escAttr(url) + '" target="_blank" rel="noopener noreferrer">查看</a>' : '-') + '</td>' +
                 '</tr>';
         });
         html += '</tbody></table></td></tr>';
@@ -5314,11 +5330,24 @@
             .catch(function(err) { console.error('加载主页检查结果失败:', err); });
     }
 
+    function onHomepageModeChange() {
+        var mode = (document.getElementById('homepageMode') || {}).value || 'time';
+        var daysSel = document.getElementById('homepageDaysRange');
+        var limitInput = document.getElementById('homepagePostsLimit');
+        if (daysSel) daysSel.disabled = (mode === 'count');
+        if (limitInput) limitInput.disabled = (mode === 'time');
+    }
+
     function startHomepageCheck() {
         var usernames = getSelectedHomepageUsernames();
         if (usernames.length === 0) { alert('请先在寄样列表中勾选红人'); return; }
+        var mode = (document.getElementById('homepageMode') || {}).value || 'time';
         var daysRange = parseInt((document.getElementById('homepageDaysRange') || {}).value, 10) || 7;
-        var postsLimit = parseInt((document.getElementById('homepagePostsLimit') || {}).value, 10) || 10;
+        var postsLimit = parseInt((document.getElementById('homepagePostsLimit') || {}).value, 10);
+        if (isNaN(postsLimit) || postsLimit < 1 || postsLimit > 100) {
+            alert('抓取数量需为 1 - 100 的正整数');
+            return;
+        }
         var highlightWords = (document.getElementById('homepageHighlightWords') || {}).value || '';
 
         var btn = document.getElementById('homepageCheckBtn');
@@ -5333,21 +5362,25 @@
         for (var i = 0; i < usernames.length; i += BATCH_SIZE) batches.push(usernames.slice(i, i + BATCH_SIZE));
         var allResults = [];
         var failedBatches = [];
-        var startTime = Date.now();
+        var totalCount = usernames.length;
+        var secs = 0;
+        // 每秒刷新"已等待 X 秒"
+        var timer = setInterval(function() {
+            secs++;
+            if (statusEl) statusEl.innerText = '检查中... 已完成 ' + allResults.length + ' / ' + totalCount + ' 个红人，已等待 ' + secs + ' 秒';
+        }, 1000);
 
         function postBatch(batch) {
             return fetch('/api/pipeline-check-homepage', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ usernames: batch, daysRange: daysRange, postsLimit: postsLimit, highlightWords: highlightWords })
+                body: JSON.stringify({ usernames: batch, mode: mode, daysRange: daysRange, postsLimit: postsLimit, highlightWords: highlightWords })
             }).then(function(resp) { return resp.json(); });
         }
 
         function runNext(idx) {
             if (homepageCheckStop) { finish(true); return; }
             if (idx >= batches.length) { finish(false); return; }
-            var secs = Math.floor((Date.now() - startTime) / 1000);
-            statusEl.innerText = '检查中... 已完成 ' + idx + ' / ' + batches.length + '（共 ' + usernames.length + ' 个红人，已等待 ' + secs + ' 秒）';
 
             postBatch(batches[idx]).then(function(data) {
                 if (homepageCheckStop) return;
@@ -5358,6 +5391,7 @@
                     failedBatches.push(idx + 1);
                     console.warn('主页检查 批次 ' + (idx + 1) + ' 失败:', (data && data.error) || '未知错误');
                 }
+                if (statusEl) statusEl.innerText = '检查中... 已完成 ' + allResults.length + ' / ' + totalCount + ' 个红人，已等待 ' + secs + ' 秒';
             }).catch(function(err) {
                 if (homepageCheckStop) return;
                 failedBatches.push(idx + 1);
@@ -5366,6 +5400,7 @@
         }
 
         function finish(stopped) {
+            if (timer) { clearInterval(timer); timer = null; }
             if (stopBtn) stopBtn.style.display = 'none';
             if (btn) btn.disabled = false;
 
