@@ -55,6 +55,7 @@
         .cd-toolbar .btn-danger { padding: 0 14px; font-size: 13px; border-radius: 6px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-sizing: border-box; }
         .cd-toolbar .btn-secondary { background: #f1f5f9; border: 1px solid #d1d5db; color: #1e293b; }
         .cd-toolbar .btn-secondary:hover { background: #e2e8f0; }
+        .cd-toolbar .btn-secondary:disabled { background: #f1f5f9; border-color: #e2e8f0; color: #cbd5e1; cursor: not-allowed; }
         .cd-toolbar .btn-danger { background: #ef4444; color: white; border: none; }
         .cd-toolbar .btn-danger:hover { background: #dc2626; }
         /* 视图切换按钮 */
@@ -1971,6 +1972,7 @@
                     <div class="toolbar-left">
                         <button class="btn-secondary" onclick="cdImportCSV()">批量导入</button>
                         <button class="btn-danger" id="cdDeleteSelectedBtn" onclick="deleteSelectedCDRecords()" style="display:none;">删除选中</button>
+                        <button class="btn-secondary" id="reinviteBtn" onclick="openReinviteModal()" disabled>✉️ 复邀</button>
                         <button class="btn-secondary" onclick="refreshCDData()">🔄 刷新</button>
                     </div>
                     <div class="toolbar-right">
@@ -2407,6 +2409,19 @@
             <button class="btn-secondary" onclick="cdManualAddPost()" style="margin-top:10px;width:100%;">+ 添加帖子</button>
         </div>
         <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('cdManualModal')">取消</button><button class="btn-primary" onclick="cdSubmitManual()">保存</button></div>
+    </div>
+</div>
+
+<!-- C&D 复邀弹窗 -->
+<div id="reinviteModal" class="modal">
+    <div class="modal-content" style="width:500px;max-width:95%;">
+        <div class="modal-header"><h3>复邀（回复已有邮件线程）</h3><button onclick="closeModal('reinviteModal')">×</button></div>
+        <div class="modal-body">
+            <div id="reinviteSummary" style="margin-bottom:16px;padding:10px 14px;background:#eef2ff;border-radius:8px;text-align:center;font-size:13px;"></div>
+            <div class="form-group"><label>Gmail 模板名</label><input type="text" id="reinviteTemplateName" placeholder="如 复邀-再次合作" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
+            <div class="form-group"><label>定时发送时间</label><input type="time" id="reinviteScheduleTime" value="23:10" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
+        </div>
+        <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('reinviteModal')">取消</button><button class="btn-primary" onclick="confirmReinvite()">确认发送</button></div>
     </div>
 </div>
 
@@ -7033,13 +7048,84 @@
         updateCdDeleteButton();
     }
 
-    // ── 更新删除选中按钮显示状态 ──
+    // ── 更新删除选中按钮 / 复邀按钮显示状态 ──
     function updateCdDeleteButton() {
         var checkedBoxes = document.querySelectorAll('.cd-row-checkbox:checked');
         var deleteBtn = document.getElementById('cdDeleteSelectedBtn');
         if (deleteBtn) {
             deleteBtn.style.display = checkedBoxes.length > 0 ? 'inline-block' : 'none';
         }
+        var reinviteBtn = document.getElementById('reinviteBtn');
+        if (reinviteBtn) {
+            reinviteBtn.disabled = checkedBoxes.length === 0;
+        }
+    }
+
+    // ── 收集选中 C&D 记录的红人邮箱（去重，兼容汇总/按月两种视图）──
+    function getSelectedCDEmails() {
+        var boxes = document.querySelectorAll('.cd-row-checkbox:checked');
+        var emails = [];
+        var seen = {};
+        boxes.forEach(function(box) {
+            var dataId = box.getAttribute('data-id');
+            var email = null;
+            if (cdViewMode === 'aggregated') {
+                email = dataId;
+            } else {
+                var item = cdData.find(function(r) { return r.id === dataId; });
+                if (item) email = item.email;
+            }
+            if (email) {
+                var key = String(email).trim().toLowerCase();
+                if (!seen[key]) { seen[key] = true; emails.push(email); }
+            }
+        });
+        return emails;
+    }
+
+    // ── C&D 复邀 ──
+    function openReinviteModal() {
+        var emails = getSelectedCDEmails();
+        if (emails.length === 0) { alert('请先勾选要复邀的红人'); return; }
+        document.getElementById('reinviteSummary').innerText = '📧 本次复邀 ' + emails.length + ' 个红人（按邮箱去重）';
+        document.getElementById('reinviteModal').style.display = 'flex';
+    }
+
+    function confirmReinvite() {
+        var emails = getSelectedCDEmails();
+        if (emails.length === 0) { alert('请先勾选要复邀的红人'); return; }
+        var templateName = ((document.getElementById('reinviteTemplateName') || {}).value || '').trim();
+        var scheduleTime = ((document.getElementById('reinviteScheduleTime') || {}).value || '').trim();
+        if (!templateName) { alert('请填写 Gmail 模板名'); return; }
+        if (!scheduleTime) { alert('请填写定时发送时间'); return; }
+
+        var recipients = emails.map(function(email) { return { email: email }; });
+        var confirmBtn = document.querySelector('#reinviteModal .btn-primary');
+        if (confirmBtn) confirmBtn.disabled = true;
+
+        fetch('/api/reinvite-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipients: recipients, templateName: templateName, scheduleTime: scheduleTime })
+        }).then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (confirmBtn) confirmBtn.disabled = false;
+            if (data && data.results !== undefined) {
+                closeModal('reinviteModal');
+                var failedList = (data.results || []).filter(function(r) { return r.status === 'error'; });
+                if (failedList.length > 0) {
+                    showToast('复邀完成：成功 ' + data.success + ' 个，失败 ' + data.failed + ' 个（' + failedList.map(function(r) { return r.email; }).join(', ') + '）', 'error');
+                } else {
+                    showToast('复邀完成：成功 ' + data.success + ' 个红人', 'success');
+                }
+            } else {
+                alert('复邀失败: ' + (data && data.error ? data.error : '未知错误'));
+            }
+        }).catch(function(err) {
+            if (confirmBtn) confirmBtn.disabled = false;
+            console.error('[reinvite] 请求失败:', err);
+            alert('请求失败: ' + err.message);
+        });
     }
 
     // ── 删除选中的记录 ──

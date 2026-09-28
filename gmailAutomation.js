@@ -320,6 +320,234 @@ class GmailAutomation extends EventEmitter {
     this._log(`✅ 邮件发送流程完成: ${email}`);
   }
 
+  // ─── 复邀（回复已有邮件线程）──────────────────────
+
+  async reinviteSingleEmail(email, templateName, scheduleTime) {
+    // 整个复邀流程的总超时保护（2 分钟），与 sendSingleEmail 一致
+    const TIMEOUT_MS = 120000;
+    let timer;
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const done = (fn, val) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        fn(val);
+      };
+      timer = setTimeout(() => done(reject, new Error('复邀流程超时（2 分钟），已中止')), TIMEOUT_MS);
+      this._reinviteSingleEmailCore(email, templateName, scheduleTime)
+        .then((r) => done(resolve, r))
+        .catch((err) => done(reject, err));
+    });
+  }
+
+  async _reinviteSingleEmailCore(email, templateName, scheduleTime) {
+    this._log(`开始复邀: ${email} | 模板: ${templateName}`);
+
+    if (scheduleTime) {
+      const parts = scheduleTime.split(':');
+      this.scheduleHour = parseInt(parts[0], 10);
+      this.scheduleMinute = parseInt(parts[1], 10) || 0;
+    }
+
+    // 0. 清理残留写信窗口
+    await this._closeAnyComposeWindow();
+
+    // 1. 搜索邮箱
+    await this._searchEmail(email);
+
+    // 2. 打开第一条（最新）邮件
+    await this._openFirstEmail();
+
+    // 3. 点 Reply
+    await this._clickReply();
+
+    // 4. 打开模板面板 + 选模板（回复框的 ⋮ 菜单里同样有 Templates）
+    await this._openTemplatesPanel();
+    await this._sleep(1000);
+    await this._selectTemplate(templateName);
+    await this._sleep(1000);
+    await this._handleInsertFilesDialog();
+
+    // 5. 定时发送
+    await this._scheduleSendReply();
+
+    // 6. 关闭残留窗口
+    await this._closeAnyComposeWindow();
+
+    this._log(`✅ 复邀流程完成: ${email}`);
+  }
+
+  // 在 Gmail 顶部搜索框搜邮箱并回车
+  async _searchEmail(email) {
+    this._log(`在 Gmail 搜索邮箱: ${email}`);
+    const searchSelectors = [
+      'input[aria-label="Search mail"]',
+      'input[aria-label*="Search"]',
+      'input[name="q"]',
+      'input[placeholder*="Search"]',
+      'input[aria-label*="搜索"]',
+    ];
+    const searchBox = await this._waitForAnyVisible(searchSelectors, 10000);
+    if (!searchBox) throw new Error('无法找到 Gmail 搜索框');
+    await searchBox.click();
+    await searchBox.fill('');
+    await searchBox.fill(email);
+    await this.page.keyboard.press('Enter');
+    await this._sleep(3000);
+    this._log(`已搜索 ${email}，等待结果...`);
+  }
+
+  // 点搜索结果的第一条（最新）邮件。Gmail 列表新→旧排列，取 DOM 第一个可见行。
+  async _openFirstEmail() {
+    this._log('点击搜索结果第一条（最新）邮件...');
+    const row = this.page.locator(
+      'div[role="main"] tr[role="row"], div[role="main"] tr.zA, div[role="main"] tr.yO'
+    ).filter({ visible: true }).first();
+    try {
+      await row.waitFor({ state: 'visible', timeout: 15000 });
+    } catch {
+      throw new Error('未找到该邮箱的往来邮件（搜索结果为空）');
+    }
+    await row.click();
+    await this._sleep(3000);
+  }
+
+  // 点邮件里的 Reply / 回复 按钮（找不到时用键盘 R 兜底）
+  async _clickReply() {
+    this._log('点击 Reply / 回复 按钮...');
+    await this.page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await this._sleep(800);
+
+    const replySelectors = [
+      'div[role="button"][data-tooltip="Reply"]',
+      'div[role="button"][aria-label*="Reply"]',
+      'div[role="button"][aria-label*="回复"]',
+      'span[data-tooltip="Reply"]',
+      'span[data-tooltip="回复"]',
+    ];
+    const replyBtn = await this._waitForAnyVisible(replySelectors, 10000);
+    if (!replyBtn) {
+      this._log('未找到 Reply 按钮，尝试键盘快捷键 R...');
+      await this.page.keyboard.press('r');
+      await this._sleep(3000);
+      return;
+    }
+    await replyBtn.click();
+    await this._sleep(3000);
+  }
+
+  // 复邀定时发送：回复是内联回复框，不在 div[role="dialog"] 里，
+  // 所以单独写一份（不复用 _scheduleSend 里的 isInDialog 限制）。
+  async _scheduleSendReply() {
+    this._log('正在设置复邀邮件的定时发送...');
+
+    // 找回复框里的 "More send options" 下拉箭头（全页可见的即可，回复框是当前唯一活动写信区）
+    let dropArrow = null;
+    const allButtons = await this.page.$$('div[role="button"]');
+    for (const btn of allButtons) {
+      const ariaLabel = await btn.getAttribute('aria-label');
+      const isVisible = await btn.isVisible();
+      if (ariaLabel === 'More send options' && isVisible) {
+        dropArrow = btn;
+        break;
+      }
+    }
+    if (!dropArrow) {
+      throw new Error('无法找到回复框的 More send options 下拉箭头');
+    }
+    await dropArrow.click();
+    await this._sleep(800);
+
+    // 选择 Schedule send / 安排发送
+    const scheduleOptionSelectors = [
+      '[role="menuitem"][aria-label*="Schedule"]',
+      '[role="menuitem"][aria-label*="安排"]',
+      '[role="menuitem"][aria-label*="定时"]',
+      'div[role="menuitem"]:has-text("Schedule send")',
+      'div[role="menuitem"]:has-text("安排发送")',
+      'div[role="menuitem"]:has-text("定时发送")',
+    ];
+    let scheduleOption = await this._waitForAnyVisible(scheduleOptionSelectors, 8000);
+    if (!scheduleOption) {
+      await this._debugDumpMenuItems('复邀 - 查找 Schedule send 失败');
+      throw new Error('无法找到定时发送选项（Schedule send / 安排发送）');
+    }
+    await scheduleOption.click();
+    await this._sleep(800);
+
+    // 选择 Pick date & time
+    const pickDateSelectors = [
+      'text="Pick date & time"',
+      'text="选择日期和时间"',
+      'div[role="menuitem"]:has-text("Pick date")',
+    ];
+    let pickDateFound = false;
+    for (const selector of pickDateSelectors) {
+      try {
+        const pickDate = await this.page.$(selector);
+        if (pickDate && await pickDate.isVisible()) {
+          await pickDate.click();
+          pickDateFound = true;
+          break;
+        }
+      } catch (err) {}
+    }
+    if (!pickDateFound) {
+      this._log('未找到自定义日期时间选项，继续');
+    }
+    await this._sleep(800);
+
+    // 设置时间
+    const hour12 = this.scheduleHour > 12 ? this.scheduleHour - 12 : (this.scheduleHour === 0 ? 12 : this.scheduleHour);
+    const ampm = this.scheduleHour >= 12 ? 'PM' : 'AM';
+    const minute = String(this.scheduleMinute || 0).padStart(2, '0');
+    const timeStr = `${hour12}:${minute} ${ampm}`;
+    this._log(`正在设置定时时间: ${timeStr}`);
+
+    const timeInput = await this.page.$('input[aria-label="Time"]');
+    if (timeInput && await timeInput.isVisible()) {
+      await timeInput.click();
+      await timeInput.fill('');
+      await timeInput.fill(timeStr);
+    } else {
+      await this.page.evaluate((t) => {
+        const input = document.querySelector('input[aria-label="Time"]');
+        if (input) {
+          input.value = t;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }, timeStr);
+    }
+    await this.page.keyboard.press('Enter');
+    await this._sleep(1000);
+
+    // 点击确认发送
+    const confirmSelectors = [
+      'button[aria-label*="Schedule"]',
+      '[role="button"][aria-label*="Schedule"]',
+      '[aria-label*="安排发送"]',
+      'button:has-text("Schedule send")',
+      'div[role="button"]:has-text("Schedule send")',
+      'button:has-text("安排发送")',
+      'div[role="button"]:has-text("安排发送")',
+    ];
+    const confirmBtn = await this._waitForAnyVisible(confirmSelectors, 5000);
+    if (confirmBtn) {
+      await confirmBtn.click();
+      this._log('已点击确认发送（Schedule send）');
+    } else {
+      this._log('确认发送按钮超时，尝试按 Enter 兜底');
+      await this.page.keyboard.press('Enter');
+      await this._sleep(2000);
+    }
+
+    await this._sleep(2000);
+    await this._handleConfirmationDialog();
+    await this._closeAllDialogs();
+  }
+
   // ─── 1. 点击 Compose ─────────────────────────────
 
   async _clickCompose() {

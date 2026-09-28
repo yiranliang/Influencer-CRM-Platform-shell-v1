@@ -487,6 +487,76 @@ function createServer() {
     return;
   }
 
+  // POST /api/reinvite-emails — 复邀：回复已有邮件线程
+  if (pathname === '/api/reinvite-emails' && req.method === 'POST') {
+    parseBody(req).then(async (body) => {
+      console.log('[reinvite-emails] === 收到请求 ===');
+      const { recipients, templateName, scheduleTime } = body;
+
+      // ── 参数验证 ──────────────────────────────────
+      if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
+        sendJSON(res, 400, { success: false, error: '没有收件人' });
+        return;
+      }
+      if (recipients.some(r => !r.email)) {
+        sendJSON(res, 400, { success: false, error: '收件人缺少 email 字段' });
+        return;
+      }
+      if (!templateName || !String(templateName).trim()) {
+        sendJSON(res, 400, { success: false, error: '缺少模板名（templateName）' });
+        return;
+      }
+
+      const finalTemplateName = String(templateName).trim();
+      const finalScheduleTime = scheduleTime || '23:10';
+      const processed = recipients.map(r => ({ email: r.email }));
+      console.log(`[reinvite-emails] ${processed.length} 个红人, 模板: "${finalTemplateName}", 定时: ${finalScheduleTime}`);
+
+      // ── 串行复邀循环 ──────────────────────────────
+      const automation = new GmailAutomation({ headless: false });
+      let successCount = 0;
+      let failedCount = 0;
+      const results = [];
+
+      try {
+        await automation.init();
+        await automation.ensureLoggedIn();
+
+        for (let i = 0; i < processed.length; i++) {
+          const r = processed[i];
+          console.log(`[reinvite-emails] [${i + 1}/${processed.length}] ${r.email}`);
+          try {
+            await automation.reinviteSingleEmail(r.email, finalTemplateName, finalScheduleTime);
+            successCount++;
+            results.push({ email: r.email, status: 'success' });
+            console.log(`[reinvite-emails] ✅ ${r.email} 已定时`);
+          } catch (err) {
+            failedCount++;
+            results.push({ email: r.email, status: 'error', error: err.message });
+            console.error(`[reinvite-emails] ❌ ${r.email}:`, err.message);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+          // 每个红人间隔几秒，防 Gmail 限流
+          if (i < processed.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+
+        console.log(`[reinvite-emails] === ${successCount} 成功, ${failedCount} 失败 ===`);
+        sendJSON(res, 200, { success: successCount, failed: failedCount, total: processed.length, results });
+      } catch (err) {
+        console.error('[reinvite-emails] ❌ 异常:', err.message);
+        sendJSON(res, 500, { success: false, error: err.message });
+      } finally {
+        await automation.cleanup().catch(() => {});
+      }
+    }).catch(err => {
+      console.error('[reinvite-emails] ❌ JSON 解析失败:', err.message);
+      sendJSON(res, 400, { success: false, error: '请求格式错误' });
+    });
+    return;
+  }
+
   if (pathname === '/api/influencers' && req.method === 'GET') {
     try {
       if (fs.existsSync(INFLUENCER_DATA_FILE)) {
