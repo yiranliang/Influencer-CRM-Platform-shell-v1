@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -2337,7 +2337,7 @@
                 </p>
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                     <label for="contractSignerNameInput" style="font-size:13px;color:#475569;">对接人名字</label>
-                    <input type="text" id="contractSignerNameInput" placeholder="如：Stella Leung" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                    <input type="text" id="contractSignerNameInput" placeholder="如：Zhang San" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
                 </div>
                 <div style="margin-top:16px;">
                     <button class="btn-primary" onclick="saveContractConfig()">💾 保存设置</button>
@@ -2677,7 +2677,7 @@
     // 品牌邮件标题配置（从 /api/email-config 加载，可在 Settings 页面中修改）
     var emailConfig = {};
     // 合同/发票签署人姓名（从 /api/contract-config 加载，可在 Settings 页面中修改）
-    var contractSignerName = 'Stella Leung';
+    var contractSignerName = '';
 
     function escHTML(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
 
@@ -2777,16 +2777,7 @@
             .catch(function(err) {
                 console.error('加载邮件配置失败:', err);
                 // 使用默认配置
-                emailConfig = {
-                    "Saodimallsu": {
-                        "subject": "A fresh take on fall style – Saodimallsu collab invitation @{name}",
-                        "templateName": "首次触达-常规毛衣款"
-                    },
-                    "Aoysky": {
-                        "subject": "Affordable, chic activewear – Aoysky collab invitation @{name}",
-                        "templateName": "首次触达-瑜伽款"
-                    }
-                };
+                emailConfig = {};
                 renderEmailConfigForm();
             });
     }
@@ -2911,7 +2902,7 @@
                 if (addModal && addModal.style.display === 'flex') {
                     var addBrandSelect = document.getElementById('add_brand');
                     if (addBrandSelect) {
-                        var curBrand = addBrandSelect.value || 'Saodimallsu';
+                        var curBrand = addBrandSelect.value || '';
                         addBrandSelect.innerHTML = renderBrandOptions(curBrand);
                         if (addBrandSelect.querySelector('option[value="' + curBrand + '"]')) {
                             addBrandSelect.value = curBrand;
@@ -2938,13 +2929,13 @@
         fetch('/api/contract-config')
             .then(function(res) { return res.json(); })
             .then(function(data) {
-                contractSignerName = (data && data.signerName) ? data.signerName : 'Stella Leung';
+                contractSignerName = (data && data.signerName) ? data.signerName : '';
                 console.log('[contract-config] 读取 signerName=' + contractSignerName);
                 renderContractConfigForm();
             })
             .catch(function(err) {
                 console.error('加载签署人配置失败:', err);
-                contractSignerName = 'Stella Leung';
+                contractSignerName = '';
                 renderContractConfigForm();
             });
     }
@@ -2969,7 +2960,7 @@
         .then(function(res) { return res.json(); })
         .then(function(data) {
             if (data.success) {
-                contractSignerName = data.signerName || 'Stella Leung';
+                contractSignerName = data.signerName || '';
                 statusEl.textContent = '✅ 保存成功';
                 statusEl.style.color = '#22c55e';
                 console.log('[contract-config] 保存 signerName=' + contractSignerName);
@@ -2992,7 +2983,7 @@
         var brands = Object.keys(emailConfig);
         if (brands.length === 0) {
             // 如果 emailConfig 为空，使用默认品牌
-            brands = ['Saodimallsu', 'Aoysky'];
+            brands = [];
         }
 
         var html = '';
@@ -3388,7 +3379,7 @@
                                             count, activeStatuses.includes(status));
             });
         } else if (type === 'brand') {
-            collectFilterOptions('brand', ['Saodimallsu', 'Aoysky']).forEach(function(opt) {
+            collectFilterOptions('brand', []).forEach(function(opt) {
                 html += navDropdownItemHTML('brand', opt.value, opt.label, opt.count,
                                             isOptionActive(activeBrands, opt.value));
             });
@@ -4282,7 +4273,7 @@
         // ★ 动态渲染品牌下拉框（与邮件模板设置中的品牌列表保持同步）
         var brandSelect = document.getElementById('add_brand');
         if (brandSelect) {
-            var currentBrand = brandSelect.value || 'Saodimallsu';
+            var currentBrand = brandSelect.value || '';
             brandSelect.innerHTML = renderBrandOptions(currentBrand);
             if (brandSelect.querySelector('option[value="' + currentBrand + '"]')) {
                 brandSelect.value = currentBrand;
@@ -4457,7 +4448,7 @@
         var selectedInfluencers = getSelectedInfluencers();
         var brandGroups = {};
         selectedInfluencers.forEach(function(inf) {
-            var brand = inf.brand || 'Saodimallsu';
+            var brand = inf.brand || '';
             if (!brandGroups[brand]) brandGroups[brand] = [];
             brandGroups[brand].push(inf);
         });
@@ -4527,7 +4518,7 @@
 
         // 构建 recipients — 每个红人携带所属品牌的标题模板
         var recipients = selectedInfluencers.map(function(inf) {
-            var brand = inf.brand || 'Saodimallsu';
+            var brand = inf.brand || '';
             return {
                 id: inf.id,
                 email: inf.email,

@@ -1,4 +1,4 @@
-import http from 'http';
+﻿import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,9 +7,13 @@ import GmailAutomation from './gmailAutomation.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
 // 代理配置：国内网络下 Apify 必须走代理才能访问（undici 全局 dispatcher，一次设置所有 fetch 生效）
-const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || 'http://127.0.0.1:7897';
-setGlobalDispatcher(new ProxyAgent(PROXY_URL));
-console.log('[proxy] 使用代理:', PROXY_URL);
+const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
+if (PROXY_URL) {
+  setGlobalDispatcher(new ProxyAgent(PROXY_URL));
+  console.log('[proxy] using proxy:', PROXY_URL);
+} else {
+  console.log('[proxy] no proxy, direct connection');
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -401,10 +405,7 @@ function createServer() {
       const { recipients, scheduleTime } = body;
 
       // ── 品牌 → Gmail 模板映射 ─────────────────────
-      const BRAND_TEMPLATES = {
-        'Saodimallsu': '首次触达-常规毛衣款',
-        'Aoysky': '首次触达-瑜伽款'
-      };
+      const BRAND_TEMPLATES = {};
 
       // ── 参数验证 ──────────────────────────────────
       if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
@@ -427,7 +428,7 @@ function createServer() {
         email: r.email,
         name: r.name || (r.email ? r.email.split('@')[0] : ''),
         firstName: r.firstName || '',
-        brand: r.brand || 'Saodimallsu',
+        brand: r.brand || '',
         subjectTemplate: r.subjectTemplate || '合作邀请 @{name}',
         templateName: r.templateName || ''
       }));
@@ -1146,17 +1147,7 @@ function createServer() {
         const data = JSON.parse(fs.readFileSync(EMAIL_CONFIG_FILE, 'utf8'));
         sendJSON(res, 200, data);
       } else {
-        const defaultConfig = {
-          'Saodimallsu': {
-            'subject': 'A fresh take on fall style – Saodimallsu collab invitation @{name}',
-            'templateName': '首次触达-常规毛衣款'
-          },
-          'Aoysky': {
-            'subject': 'Affordable, chic activewear – Aoysky collab invitation @{name}',
-            'templateName': '首次触达-瑜伽款'
-          }
-        };
-        fs.writeFileSync(EMAIL_CONFIG_FILE, JSON.stringify(defaultConfig, null, 2));
+        const defaultConfig = {};
         sendJSON(res, 200, defaultConfig);
       }
     } catch (err) {
@@ -1184,12 +1175,10 @@ function createServer() {
   // GET /api/contract-config — 返回合同/发票签署人配置
   if (pathname === '/api/contract-config' && req.method === 'GET') {
     try {
-      let data = { signerName: 'Stella Leung' };
+      let data = { signerName: '' };
       if (fs.existsSync(CONTRACT_CONFIG_FILE)) {
-        data = JSON.parse(fs.readFileSync(CONTRACT_CONFIG_FILE, 'utf8'));
-      } else {
-        fs.writeFileSync(CONTRACT_CONFIG_FILE, JSON.stringify(data, null, 2));
-      }
+      data = JSON.parse(fs.readFileSync(CONTRACT_CONFIG_FILE, 'utf8'));
+    }
       console.log('[contract-config] GET signerName=' + (data.signerName || ''));
       sendJSON(res, 200, data);
     } catch (err) {
@@ -1204,7 +1193,7 @@ function createServer() {
     parseBody(req).then(body => {
       try {
         const signerName = (body && typeof body.signerName === 'string') ? body.signerName.trim() : '';
-        const config = { signerName: signerName || 'Stella Leung' };
+        const config = { signerName: signerName || '' };
         fs.writeFileSync(CONTRACT_CONFIG_FILE, JSON.stringify(config, null, 2));
         console.log('[contract-config] 保存成功 signerName=' + config.signerName);
         sendJSON(res, 200, { success: true, signerName: config.signerName });

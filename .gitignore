@@ -39,3 +39,6 @@ contract_config.json
 tools_config.json
 pipeline_homepage_check.json
 discovery_history.json
+start.local.bat
+*.bak
+*.bak*

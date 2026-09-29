@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+﻿import { google } from 'googleapis';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -6,8 +6,6 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 设置代理（根据你的实际端口修改）
-process.env.HTTPS_PROXY = 'http://127.0.0.1:7897';
-process.env.HTTP_PROXY = 'http://127.0.0.1:7897';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -22,7 +20,10 @@ let gmailClient = null;
 // 获取授权客户端（优先使用已保存的 token）
 async function getGmailClient() {
   if (gmailClient) return gmailClient;
-
+  if (!fs.existsSync(CREDENTIALS_PATH)) {
+    console.log('[gmail-stats] credentials.json not configured, Gmail features disabled');
+    return null;
+  }
   const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
 
   const auth = new google.auth.OAuth2(
@@ -90,7 +91,9 @@ async function getMessageCount(gmail, query) {
 // ── Gmail 统计数据 ──
 export async function getGmailStats() {
   const gmail = await getGmailClient();
-  const now = new Date();
+  if (!gmail) {
+    return { sent7Days: 0, replies7Days: 0, sent30Days: 0, replyRate: 0, prevSent7Days: 0, prevReplies7Days: 0, prevReplyRate: 0 };
+  }  const now = new Date();
 
   // 近7天范围：7天前 → 今天
   const start7 = new Date(now);
@@ -153,7 +156,7 @@ export async function getGmailStats() {
 
 export async function getInfluencerLabels(email) {
   const gmail = await getGmailClient();
-
+  if (!gmail) return [];
   const msgRes = await gmail.users.messages.list({
     userId: 'me',
     q: `from:${email} OR to:${email}`,
