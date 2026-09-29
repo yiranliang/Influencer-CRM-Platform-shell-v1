@@ -2297,6 +2297,10 @@
         <!-- Settings 页面 -->
         <div id="page-settings" class="page-content">
             <h2 class="page-title">Settings - 设置</h2>
+            <div id="configStatusCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
+                <h3 style="margin:0 0 12px 0;font-size:15px;">配置状态</h3>
+                <div id="configStatusBody" style="font-size:13px;color:#64748b;">加载中...</div>
+            </div>
             <div id="setting-email" class="setting-panel active" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
                 <h3>邮件模板设置</h3>
                 <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">
@@ -2922,6 +2926,45 @@
             statusEl.style.color = '#ef4444';
             console.error('保存邮件配置失败:', err);
         });
+    }
+
+    // ── 配置状态卡片 ──
+    function loadConfigStatus() {
+        fetch('/api/config-status')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                renderConfigStatus(data);
+            })
+            .catch(function(err) {
+                console.error('加载配置状态失败:', err);
+                var body = document.getElementById('configStatusBody');
+                if (body) body.textContent = '加载失败';
+            });
+    }
+
+    function renderConfigStatus(data) {
+        var body = document.getElementById('configStatusBody');
+        if (!body) return;
+        var items = [
+            { key: 'gmailOAuth', label: 'Gmail OAuth', hint: '将 credentials.json 放到项目根目录（Analytics 功能需要）' },
+            { key: 'apifyToken', label: 'Apify Token', hint: '在项目根目录创建 apify_config.json，填入 apiToken（Discovery 功能需要）' },
+            { key: 'emailTemplates', label: '邮件模板', hint: '在下方「邮件模板设置」中新增品牌并配置模板' },
+            { key: 'contractSigner', label: '合同签署人', hint: '在「合同/发票签署设置」中填写对接人名字' }
+        ];
+        var html = '<table style="width:100%;border-collapse:collapse;">';
+        items.forEach(function(it) {
+            var ok = !!data[it.key];
+            var badge = ok
+                ? '<span style="color:#22c55e;font-weight:600;">✅ 已配置</span>'
+                : '<span style="color:#ef4444;font-weight:600;">❌ 未配置</span>';
+            var hint = ok ? '' : '<div style="color:#94a3b8;font-size:12px;margin-top:2px;">' + it.hint + '</div>';
+            html += '<tr style="border-bottom:1px solid #f1f5f9;">'
+                + '<td style="padding:10px 12px 10px 0;width:140px;font-weight:500;color:#334155;">' + it.label + '</td>'
+                + '<td style="padding:10px 0;">' + badge + hint + '</td>'
+                + '</tr>';
+        });
+        html += '</table>';
+        body.innerHTML = html;
     }
 
     // ── 合同/发票签署人配置 ──
@@ -6374,6 +6417,7 @@
             if (pageName === 'settings') {
                 loadEmailConfig();
                 loadContractConfig();
+                loadConfigStatus();
             }
             // 切换到 Tools 时刷新工具箱
             if (pageName === 'tools') {

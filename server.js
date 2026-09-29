@@ -1172,6 +1172,56 @@ function createServer() {
     return;
   }
 
+  // GET /api/config-status 鈥?杩斿洖鍚勯厤缃」鐨勫瓨鍦ㄧ姸鎬侊紝渚涘墠绔睍绀?
+  if (pathname === '/api/config-status' && req.method === 'GET') {
+    try {
+      // Gmail OAuth
+      const gmailOAuth = fs.existsSync(path.join(__dirname, 'credentials.json'));
+      
+      // Apify Token
+      let apifyToken = false;
+      try {
+        const apifyPath = path.join(__dirname, 'apify_config.json');
+        if (fs.existsSync(apifyPath)) {
+          const cfg = JSON.parse(fs.readFileSync(apifyPath, 'utf8'));
+          apifyToken = !!(cfg.apiToken && cfg.apiToken.trim());
+        }
+      } catch (e) {}
+      
+      // 閭欢妯℃澘锛堝搧鐗屽嵆 key锛?
+      let emailTemplates = false;
+      let brandCount = 0;
+      try {
+        if (fs.existsSync(EMAIL_CONFIG_FILE)) {
+          const data = JSON.parse(fs.readFileSync(EMAIL_CONFIG_FILE, 'utf8'));
+          brandCount = Object.keys(data || {}).length;
+          emailTemplates = brandCount > 0;
+        }
+      } catch (e) {}
+      
+      // 鍚堝悓绛剧讲浜?
+      let contractSigner = false;
+      try {
+        if (fs.existsSync(CONTRACT_CONFIG_FILE)) {
+          const data = JSON.parse(fs.readFileSync(CONTRACT_CONFIG_FILE, 'utf8'));
+          contractSigner = !!(data.signerName && data.signerName.trim());
+        }
+      } catch (e) {}
+      
+      sendJSON(res, 200, {
+        gmailOAuth,
+        apifyToken,
+        emailTemplates,
+        brandCount,
+        contractSigner
+      });
+    } catch (err) {
+      console.error('[config-status] error:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
   // GET /api/contract-config — 返回合同/发票签署人配置
   if (pathname === '/api/contract-config' && req.method === 'GET') {
     try {
