@@ -42,3 +42,4 @@ discovery_history.json
 start.local.bat
 *.bak
 *.bak*
+*.mjs
