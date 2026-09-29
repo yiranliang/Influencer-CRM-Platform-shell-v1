@@ -17,6 +17,8 @@ if (PROXY_URL) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
+// ⚠️ 默认发送时间（如需修改，改这里）
+const DEFAULT_SCHEDULE_TIME = '23:10';
 const INFLUENCER_DATA_FILE = path.join(__dirname, 'influencer_data.json');
 const PIPELINE_DATA_FILE = path.join(__dirname, 'pipeline_data.json');
 const CD_DATA_FILE = path.join(__dirname, 'cd_data.json');
@@ -439,7 +441,7 @@ function createServer() {
       console.log('[send-emails] token:', fs.existsSync(tokenPath) ? '存在' : '不存在');
       console.log('[send-emails] profile:', fs.existsSync(profilePath) ? '存在' : '不存在');
 
-      const finalScheduleTime = scheduleTime || '23:10';
+      const finalScheduleTime = scheduleTime || DEFAULT_SCHEDULE_TIME;
       console.log(`[send-emails] ${processedRecipients.length} 封, 定时: ${finalScheduleTime}`);
 
       // ── 发送循环 ──────────────────────────────────
@@ -517,7 +519,7 @@ function createServer() {
       }
 
       const finalTemplateName = String(templateName).trim();
-      const finalScheduleTime = scheduleTime || '23:10';
+      const finalScheduleTime = scheduleTime || DEFAULT_SCHEDULE_TIME;
       // 日期模式：'today'（今日，过点顺延明天）| 'nextday'（次日），默认今日
       const finalMode = (mode === 'nextday') ? 'nextday' : 'today';
       const processed = normalized.map(r => ({ email: r.email, firstName: r.firstName || '' }));

@@ -2379,7 +2379,7 @@
         <div class="modal-header"><h3>发送邮件</h3><button onclick="closeModal('sendEmailModal')">×</button></div>
         <div class="modal-body">
             <div id="brandSubjectsContainer"></div>
-            <div class="form-group"><label>定时发送时间</label><input type="text" id="scheduleTime" placeholder="HH:MM" value="23:10" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
+            <div class="form-group"><label>定时发送时间</label><input type="text" id="scheduleTime" placeholder="HH:MM" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
         </div>
         <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('sendEmailModal')">取消</button><button class="btn-primary" onclick="confirmSendEmails()">确认发送</button></div>
     </div>
@@ -2447,7 +2447,7 @@
                 </div>
                 <div style="font-size:12px;color:#6b7280;margin-top:4px;">选「今日」若该时间已过会自动顺延到明天</div>
             </div>
-            <div class="form-group"><label>发送时间</label><input type="time" id="reinviteScheduleTime" value="23:10" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
+            <div class="form-group"><label>发送时间</label><input type="time" id="reinviteScheduleTime" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
         </div>
         <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('reinviteModal')">取消</button><button class="btn-primary" onclick="confirmReinvite()">确认发送</button></div>
     </div>
@@ -2635,6 +2635,8 @@
 </div>
 
 <script>
+    // ⚠️ 默认发送时间（如需修改，改这里）
+    var DEFAULT_SCHEDULE_TIME = '23:10';
     // ── Storage 访问保护（localStorage 不可用时降级为内存对象）──
     // 某些上下文（file://、沙箱 iframe、隐私模式等）访问 localStorage 会抛
     // "Access to storage is not allowed from this context"，并中断后续脚本。
@@ -4536,6 +4538,7 @@
             html += '</div>';
         }
         container.innerHTML = html;
+        document.getElementById('scheduleTime').value = DEFAULT_SCHEDULE_TIME;
         document.getElementById('sendEmailModal').style.display = 'flex';
     }
 
@@ -7273,6 +7276,7 @@
         var recipients = getSelectedCDRecipients();
         if (recipients.length === 0) { alert('请先勾选要复邀的红人'); return; }
         document.getElementById('reinviteSummary').innerText = '📧 本次复邀 ' + recipients.length + ' 个红人（按邮箱去重）';
+        document.getElementById('reinviteScheduleTime').value = DEFAULT_SCHEDULE_TIME;
         document.getElementById('reinviteModal').style.display = 'flex';
     }
 
