@@ -65,6 +65,50 @@ Google OAuth：参考 Google Cloud 文档获取 credentials.json，首次运行�
 
 建议定期备份这些文件。
 
+## 自动备份
+
+项目自带三层备份机制。
+
+### 1. 实时落盘
+
+每次操作（增删改）都会立即写入对应的 JSON 文件。关闭浏览器或崩溃不会丢数据。
+
+### 2. 启动快照
+
+每次启动 server 时，自动把数据文件备份到 backups/_onstartup/（覆盖式）。保证至少有一个"最近一次启动时"的快照。
+
+### 3. 定时自动备份（推荐开启）
+
+双击 install-backup-task.bat，会自动注册 Windows 计划任务：
+
+- 每天凌晨 3:00 运行
+- 备份到 backups/时间戳/
+- 数据文件保留 30 天，超期自动清理
+
+卸载：双击 uninstall-backup-task.bat
+
+修改频率或时间：编辑 install-backup-task.bat 里的 schtasks 那一行，再运行一次。
+
+### 备份目录结构
+
+backups/
+  20260929_180000/        每次定时备份的数据（时间戳目录）
+    influencer_data.json
+    pipeline_data.json
+    ...
+  _onstartup/             启动快照（覆盖式，只有一份）
+  _credentials/           凭证备份（覆盖式，只有一份）
+    credentials.json
+    token.json
+    apify_config.json
+  backup.log              备份日志
+
+### 关于凭证备份
+
+- 凭证文件（credentials.json / token.json / apify_config.json）单独放在 _credentials/ 子目录
+- 不要把 _credentials/ 分享或同步到网盘/U盘
+- 如果只备份数据文件，可以手动把 _credentials/ 排除，或把 backup.bat 里的 BACKUP_CREDENTIALS 改成 0
+
 ## 已知限制
 
 - 仅测试 Windows
