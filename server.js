@@ -495,7 +495,7 @@ function createServer() {
   if (pathname === '/api/reinvite-emails' && req.method === 'POST') {
     parseBody(req).then(async (body) => {
       console.log('[reinvite-emails] === 收到请求 ===');
-      const { recipients, templateName, scheduleTime } = body;
+      const { recipients, templateName, scheduleTime, mode } = body;
 
       // ── 参数验证 ──────────────────────────────────
       if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
@@ -516,8 +516,11 @@ function createServer() {
 
       const finalTemplateName = String(templateName).trim();
       const finalScheduleTime = scheduleTime || '23:10';
+      // 日期模式：'today'（今日，过点顺延明天）| 'nextday'（次日），默认今日
+      const finalMode = (mode === 'nextday') ? 'nextday' : 'today';
       const processed = normalized.map(r => ({ email: r.email, firstName: r.firstName || '' }));
-      console.log(`[reinvite-emails] ${processed.length} 个红人, 模板: "${finalTemplateName}", 定时: ${finalScheduleTime}`);
+      console.log(`[reinvite-emails] ${processed.length} 个红人, 模板: "${finalTemplateName}", 定时: ${finalScheduleTime} (${finalMode})`);
+      processed.forEach((r, i) => console.log(`[reinvite-emails]   [${i + 1}] email=${r.email} firstName="${r.firstName}"`));
 
       // ── 串行复邀循环 ──────────────────────────────
       const automation = new GmailAutomation({ headless: false });
@@ -533,7 +536,7 @@ function createServer() {
           const r = processed[i];
           console.log(`[reinvite-emails] [${i + 1}/${processed.length}] ${r.email}`);
           try {
-            await automation.reinviteSingleEmail(r.email, finalTemplateName, finalScheduleTime, r.firstName);
+            await automation.reinviteSingleEmail(r.email, finalTemplateName, finalScheduleTime, r.firstName, finalMode);
             successCount++;
             results.push({ email: r.email, status: 'success' });
             console.log(`[reinvite-emails] ✅ ${r.email} 已定时`);

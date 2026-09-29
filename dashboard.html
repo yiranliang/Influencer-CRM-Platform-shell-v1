@@ -2420,7 +2420,14 @@
         <div class="modal-body">
             <div id="reinviteSummary" style="margin-bottom:16px;padding:10px 14px;background:#eef2ff;border-radius:8px;text-align:center;font-size:13px;"></div>
             <div class="form-group"><label>Gmail 模板名</label><input type="text" id="reinviteTemplateName" placeholder="如 复邀-再次合作" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
-            <div class="form-group"><label>定时发送时间</label><input type="time" id="reinviteScheduleTime" value="23:10" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
+            <div class="form-group"><label>发送日期</label>
+                <div style="display:flex;gap:16px;align-items:center;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:14px;"><input type="radio" name="reinviteDateMode" value="today" checked> 今日</label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:14px;"><input type="radio" name="reinviteDateMode" value="nextday"> 次日</label>
+                </div>
+                <div style="font-size:12px;color:#6b7280;margin-top:4px;">选「今日」若该时间已过会自动顺延到明天</div>
+            </div>
+            <div class="form-group"><label>发送时间</label><input type="time" id="reinviteScheduleTime" value="23:10" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
         </div>
         <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('reinviteModal')">取消</button><button class="btn-primary" onclick="confirmReinvite()">确认发送</button></div>
     </div>
@@ -7102,7 +7109,12 @@
                         var rec = cdData.find(function(r) { return r.email === email; });
                         if (rec) name = rec.name || '';
                     }
-                    recipients.push({ email: email, firstName: String(name).trim().split(/\s+/)[0] || '' });
+                    // ★ 名字必须从红人库 firstName 取，不能拿 cdData.name（那是账号名/ID，如 "icyfires4"）。
+                    //   按 email 匹配红人库 → 取 firstName；取不到就留空，后端 _fillRecipientName 会兜底成 "there"。
+                    var inf = allInfluencers.find(function(i) { return i.email && String(i.email).trim().toLowerCase() === key; });
+                    var firstName = (inf && inf.firstName && String(inf.firstName).trim()) ? String(inf.firstName).trim() : '';
+                    console.log('[复邀取名] email=' + email + ' cdData.name=' + (name || '') + ' 红人库.firstName=' + (inf && inf.firstName ? inf.firstName : '') + ' → 取 "' + firstName + '"');
+                    recipients.push({ email: email, firstName: firstName });
                 }
             }
         });
@@ -7122,8 +7134,12 @@
         if (recipients.length === 0) { alert('请先勾选要复邀的红人'); return; }
         var templateName = ((document.getElementById('reinviteTemplateName') || {}).value || '').trim();
         var scheduleTime = ((document.getElementById('reinviteScheduleTime') || {}).value || '').trim();
+        var mode = 'today';
+        var modeEl = document.querySelector('input[name="reinviteDateMode"]:checked');
+        if (modeEl) mode = modeEl.value;
         if (!templateName) { alert('请填写 Gmail 模板名'); return; }
-        if (!scheduleTime) { alert('请填写定时发送时间'); return; }
+        if (!scheduleTime) { alert('请填写发送时间'); return; }
+        if (!/^\d{1,2}:\d{2}$/.test(scheduleTime)) { alert('发送时间格式应为 HH:MM'); return; }
 
         var confirmBtn = document.querySelector('#reinviteModal .btn-primary');
         if (confirmBtn) confirmBtn.disabled = true;
@@ -7131,7 +7147,7 @@
         fetch('/api/reinvite-emails', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ recipients: recipients, templateName: templateName, scheduleTime: scheduleTime })
+            body: JSON.stringify({ recipients: recipients, templateName: templateName, scheduleTime: scheduleTime, mode: mode })
         }).then(function(res) { return res.json(); })
         .then(function(data) {
             if (confirmBtn) confirmBtn.disabled = false;
