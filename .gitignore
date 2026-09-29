@@ -32,3 +32,11 @@ hboard.html*
 *寮瑰嚭*
 start.bat
 reencode_tmp.mjs 
+
+# ========== 数据文件（不进 git，仅本地） ==========
+*_data.json
+email_config.json
+contract_config.json
+tools_config.json
+pipeline_homepage_check.json
+discovery_history.json
