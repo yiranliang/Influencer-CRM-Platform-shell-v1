@@ -1,24 +1,35 @@
-AI Workflow 2.0
-红人营销工作流管理工具（Analytics / Outreach / Pipeline / C&D / Long-term / Payment / Settings 七大模块）。
+# Influencer CRM Platform (Shell v1)
 
-技术栈
-前端：原生 HTML + JavaScript + Chart.js
+红人营销全流程管理平台的**空壳版**，供开发者自行配置后使用。
 
-后端：Node.js + 原生 http 模块
+原项目为个人定制版，本仓库已移除所有个人数据、凭证和默认配置，保留完整功能代码。
 
-自动化：Playwright（Gmail 自动发邮件）
+---
 
-数据：JSON 文件存储
+## 功能
 
-环境要求
-Node.js（建议 v18+）
+- **Outreach** 红人库管理、CSV 导入、批量 Gmail 发信
+- **Pipeline** 寄样管理、状态流转、主页检查
+- **Content & Delivery** 内容交付、履约率、评级
+- **Long-term Partnership** 长期合作统计
+- **Payment** 付费管理、Invoice/Agreement 生成
+- **Discovery** Instagram 红人发现（Apify）
+- **Analytics** Gmail 数据统计（可选）
+- **Gmail 自动化** 自动发信、定时发送、复邀流程（Playwright）
 
-Windows 系统（backup.bat 为 Windows 批处理；其他系统可手动备份数据文件）
+---
 
-启动
-bash
+## 环境要求
+
+- Node.js 18+
+- Windows（目前仅测试 Windows）
+- Playwright 浏览器（`npx playwright install chromium`）
+
+---
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
 npm install
-npx playwright install
-node server.js
-启动后会自动打开浏览器访问 http://localhost:3000/dashboard.html。
-若 3000 端口被占用，会自动尝试 3001、3002…（控制台会打印实际地址），也可手动访问控制台输出的地址。
