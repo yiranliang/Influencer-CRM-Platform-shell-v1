@@ -1,3 +1,2 @@
-﻿Name,Email Address,first_name,Channel,Brand
-example_channel,creator@example.com,Jessica,Instagram,YourBrand
-another_channel,someone@example.com,Alex,Instagram,YourBrand
+date,name,email,first_name,brand,channel,status
+2025/11/5,example_channel,creator@example.com,Jessica,YourBrand,Instagram,Connected
