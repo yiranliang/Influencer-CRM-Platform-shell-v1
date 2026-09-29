@@ -4224,11 +4224,24 @@
                 var noteIdx = headers.findIndex(function(h) {
                     return h.includes('Note') || h.includes('备注') || h.includes('note');
                 });
+                // ★ 新增：触达日期列（宽容匹配，中英文）
+                var dateIdx = headers.findIndex(function(h) {
+                    var lower = h.trim().toLowerCase();
+                    return lower === 'date' || h.includes('日期');
+                });
+                // ★ 新增：状态列（宽容匹配，中英文）
+                var statusIdx = headers.findIndex(function(h) {
+                    var lower = h.trim().toLowerCase();
+                    return lower === 'status' || h.includes('状态');
+                });
 
                 var importedCount = 0;
                 var skippedCount = 0;
                 var skippedNames = [];
                 window.lastSkippedNames = [];  // ★ 全局变量，方便用户在控制台查看跳过的红人
+                // ★ status 合法值（只认英文，大小写敏感）；非法值存空并告警，不阻塞导入
+                var VALID_STATUSES = ['Connected', 'Confirm', 'Reject', 'order-pending', 'sampling', 'delivered', 'partial-posted', 'posted', 'overdue'];
+                var invalidStatuses = [];  // 收集状态值非法的行，导入结束后统一提示
 
                 for (var i = 1; i < lines.length; i++) {
                     var cols = lines[i].split(',');
@@ -4240,8 +4253,21 @@
                     var rawBrand = brandIdx >= 0 ? cols[brandIdx]?.trim() : '';
                     var rawChannel = channelIdx >= 0 ? cols[channelIdx]?.trim() : '';
                     var rawNote = noteIdx >= 0 ? cols[noteIdx]?.trim() : '';
+                    var rawDate = dateIdx >= 0 ? cols[dateIdx]?.trim() : '';
+                    var rawStatus = statusIdx >= 0 ? cols[statusIdx]?.trim() : '';
 
                     var name = rawName || rawEmail || 'unknown';
+
+                    // ★ 校验 status：空值保持默认 Connected；非法值存空并记录告警（不阻塞导入）
+                    var finalStatus = 'Connected';
+                    if (rawStatus) {
+                        if (VALID_STATUSES.indexOf(rawStatus) === -1) {
+                            finalStatus = '';
+                            invalidStatuses.push(name + ' → "' + rawStatus + '"');
+                        } else {
+                            finalStatus = rawStatus;
+                        }
+                    }
 
                     // 处理邮箱字段
                     var finalEmail = '';
@@ -4281,8 +4307,8 @@
                             brand: rawBrand || '',
                             channel: rawChannel || '',
                             note: rawNote || '',
-                            status: 'Connected',
-                            date: todayStr(),
+                            status: finalStatus,
+                            date: rawDate || todayStr(),
                             favorited: false
                         });
                         importedCount++;
@@ -4302,7 +4328,14 @@
                         toastMsg += '<br>&nbsp;&nbsp;&nbsp;' + skippedNames[s];
                     }
                 }
-                showToast(toastMsg, skippedCount > 0 ? 'warning' : 'success');
+                // ★ 状态值非法的行追加提示（已存空，不阻塞导入）
+                if (invalidStatuses.length > 0) {
+                    toastMsg += '<br>⚠️ ' + invalidStatuses.length + ' 个状态值无效（已存空）：';
+                    for (var k = 0; k < invalidStatuses.length; k++) {
+                        toastMsg += '<br>&nbsp;&nbsp;&nbsp;' + invalidStatuses[k];
+                    }
+                }
+                showToast(toastMsg, (skippedCount > 0 || invalidStatuses.length > 0) ? 'warning' : 'success');
                 // ★ 控制台输出，方便用户查看跳过的红人列表
                 console.log('📋 本次导入跳过的红人列表:', window.lastSkippedNames);
             };
