@@ -4,18 +4,23 @@
 
 这是一个"空壳版"，里面没有任何个人数据，需要你自己配置后才能用。
 
-## 快速开始
+## 快速开始（三步）
 
-第一次用，按顺序做这四步：
+第一步：安装环境
 
-1. 装 Node.js（去 https://nodejs.org 下载 LTS 版，一路点下一步）
-2. 打开命令行，进到项目文件夹，运行：
-   npm install
-3. 再运行：
-   npx playwright install chromium
-4. 双击 start.bat 启动
+下载并安装 Node.js（去 https://nodejs.org 下载 LTS 版，一路点下一步）。
 
-启动后浏览器会自动打开。如果没打开，手动访问 http://localhost:3000/dashboard.html
+第二步：双击 setup.bat
+
+程序会自动检查环境、安装依赖、下载浏览器。
+第一次运行需要几分钟（主要时间在下载浏览器，大约 180MB）。
+看到 "Setup complete!" 就成功了。
+
+第三步：双击 start.bat
+
+程序启动，浏览器自动打开。看到页面就可以开始用了。
+
+之后每次使用，只需要双击 start.bat 即可。
 
 ## 需要自己配置的内容
 
