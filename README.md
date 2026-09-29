@@ -29,8 +29,7 @@
 
 ## 快速开始
 
-### 1. 安装依赖
-
+1. 安装依赖
 ```bash
 npm install
 2. 安装 Playwright 浏览器
