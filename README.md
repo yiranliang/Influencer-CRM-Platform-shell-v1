@@ -33,3 +33,14 @@
 
 ```bash
 npm install
+2. 安装 Playwright 浏览器
+bash
+npx playwright install chromium
+3. 启动
+bash
+start.bat
+或直接：
+
+bash
+node server.js
+访问 http://localhost:3000/dashboard.html
