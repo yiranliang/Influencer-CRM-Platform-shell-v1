@@ -2301,6 +2301,19 @@
                 <h3 style="margin:0 0 12px 0;font-size:15px;">配置状态</h3>
                 <div id="configStatusBody" style="font-size:13px;color:#64748b;">加载中...</div>
             </div>
+            <div id="setting-proxy" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
+                <h3 style="margin:0 0 12px 0;font-size:15px;">网络代理</h3>
+                <p style="color:#94a3b8;font-size:13px;margin-bottom:12px;">
+                    如果你的网络需要代理才能访问 Apify / Gmail，在这里填写代理地址。留空表示直连。
+                    <br>修改后需要重启程序（关闭黑窗口，重新双击 start.bat）才生效。
+                </p>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="proxyUrlInput" placeholder="例如 http://127.0.0.1:7897" style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                    <button class="btn-primary" onclick="saveProxyConfig()" style="white-space:nowrap;">保存</button>
+                    <span id="proxyConfigStatus" style="font-size:13px;color:#94a3b8;"></span>
+                </div>
+            </div>
+
             <div id="setting-email" class="setting-panel active" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
                 <h3>邮件模板设置</h3>
                 <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">
@@ -2927,6 +2940,41 @@
             statusEl.textContent = '❌ 保存失败';
             statusEl.style.color = '#ef4444';
             console.error('保存邮件配置失败:', err);
+        });
+    }
+
+    // ── 网络代理配置 ──
+    function loadProxyConfig() {
+        fetch('/api/proxy-config')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var input = document.getElementById('proxyUrlInput');
+                if (input) input.value = (data && data.proxyUrl) ? data.proxyUrl : '';
+            })
+            .catch(function(err) { console.error('加载代理配置失败:', err); });
+    }
+
+    function saveProxyConfig() {
+        var input = document.getElementById('proxyUrlInput');
+        var proxyUrl = input ? input.value.trim() : '';
+        var statusEl = document.getElementById('proxyConfigStatus');
+        if (statusEl) { statusEl.textContent = '保存中...'; statusEl.style.color = '#94a3b8'; }
+        fetch('/api/proxy-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ proxyUrl: proxyUrl })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                if (statusEl) { statusEl.textContent = '✅ 已保存，重启后生效'; statusEl.style.color = '#22c55e'; }
+            } else {
+                if (statusEl) { statusEl.textContent = '❌ 保存失败'; statusEl.style.color = '#ef4444'; }
+            }
+        })
+        .catch(function(err) {
+            console.error('保存代理配置失败:', err);
+            if (statusEl) { statusEl.textContent = '❌ 保存失败'; statusEl.style.color = '#ef4444'; }
         });
     }
 
@@ -6421,6 +6469,7 @@
                 loadEmailConfig();
                 loadContractConfig();
                 loadConfigStatus();
+                loadProxyConfig();
             }
             // 切换到 Tools 时刷新工具箱
             if (pageName === 'tools') {

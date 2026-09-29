@@ -43,3 +43,4 @@ start.local.bat
 *.bak
 *.bak*
 *.mjs
+proxy_config.json

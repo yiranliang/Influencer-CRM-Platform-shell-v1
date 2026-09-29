@@ -6,16 +6,28 @@ import { getGmailStats, getInfluencerLabels } from './gmail_stats.js';
 import GmailAutomation from './gmailAutomation.js';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 
-// 代理配置：国内网络下 Apify 必须走代理才能访问（undici 全局 dispatcher，一次设置所有 fetch 生效）
-const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// 代理配置：优先级 proxy_config.json > 环境变量 > 直连
+// 修改 proxy_config.json 后需要重启 server 才生效
+let PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || '';
+try {
+  const proxyCfgPath = path.join(__dirname, 'proxy_config.json');
+  if (fs.existsSync(proxyCfgPath)) {
+    const proxyCfg = JSON.parse(fs.readFileSync(proxyCfgPath, 'utf8'));
+    if (proxyCfg.proxyUrl !== undefined) {
+      PROXY_URL = proxyCfg.proxyUrl;
+    }
+  }
+} catch (e) {
+  console.error('[proxy] failed to read proxy_config.json:', e.message);
+}
 if (PROXY_URL) {
   setGlobalDispatcher(new ProxyAgent(PROXY_URL));
   console.log('[proxy] using proxy:', PROXY_URL);
 } else {
   console.log('[proxy] no proxy, direct connection');
 }
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
 // ⚠️ 默认发送时间（如需修改，改这里）
 const DEFAULT_SCHEDULE_TIME = '23:10';
@@ -1171,6 +1183,39 @@ function createServer() {
         sendJSON(res, 500, { error: err.message });
       }
     }).catch(err => sendJSON(res, 400, { error: err.message }));
+    return;
+  }
+
+  // GET /api/proxy-config — 读取代理配置
+  if (pathname === '/api/proxy-config' && req.method === 'GET') {
+    try {
+      let data = { proxyUrl: '' };
+      const cfgPath = path.join(__dirname, 'proxy_config.json');
+      if (fs.existsSync(cfgPath)) {
+        data = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      }
+      sendJSON(res, 200, data);
+    } catch (err) {
+      console.error('[proxy-config] GET error:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/proxy-config — 保存代理配置（重启后生效）
+  if (pathname === '/api/proxy-config' && req.method === 'POST') {
+    parseBody(req).then((body) => {
+      try {
+        const proxyUrl = (body && typeof body.proxyUrl === 'string') ? body.proxyUrl.trim() : '';
+        const cfgPath = path.join(__dirname, 'proxy_config.json');
+        fs.writeFileSync(cfgPath, JSON.stringify({ proxyUrl }, null, 2), 'utf8');
+        console.log('[proxy-config] saved proxyUrl=' + (proxyUrl || '(empty)'));
+        sendJSON(res, 200, { success: true, proxyUrl, needRestart: true });
+      } catch (err) {
+        console.error('[proxy-config] POST error:', err.message);
+        sendJSON(res, 500, { error: err.message });
+      }
+    });
     return;
   }
 
