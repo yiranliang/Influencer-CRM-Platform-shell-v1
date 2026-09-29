@@ -88,11 +88,38 @@ _credentials 文件夹里存的是你的账号凭证（Google 授权文件、Api
 
 或者，如果你不想让程序备份凭证，可以用记事本打开 backup.bat，找到 BACKUP_CREDENTIALS=1 这一行，改成 BACKUP_CREDENTIALS=0，保存即可。
 
+## 常见问题
+
+### 启动失败：node_modules not found
+
+说明还没运行 setup.bat。双击 setup.bat 装一次即可。
+
+### 网页能打开，但"红人发现"报错 / "数据统计"报错
+
+这两个功能需要访问国外服务（Apify / Google）。如果你的网络需要代理：
+
+在 start.bat 里加一行（放在 node server.js 之前）：
+
+set HTTPS_PROXY=http://127.0.0.1:7897
+
+把 7897 换成你的代理端口。保存后再双击 start.bat 启动。
+
+### 想卸载自动备份任务
+
+双击 uninstall-backup-task.bat 即可。
+
+### 浏览器下载很慢
+
+setup.bat 已经自动使用国内镜像。如果还是慢，是你的网络问题，耐心等。
+
+### 想换 Playwright 浏览器安装位置
+
+设置环境变量 PLAYWRIGHT_BROWSERS_PATH 为你想要的路径，再运行 setup.bat。
+
 ## 已知限制
 
 - 目前只在 Windows 上测试过
-- 如果你的电脑需要代理才能访问外网，启动前需要设置环境变量 HTTPS_PROXY（例如 http://127.0.0.1:7897）
-- Playwright 浏览器默认装在 %USERPROFILE%\AppData\Local\ms-playwright，如果你想换位置，设置环境变量 PLAYWRIGHT_BROWSERS_PATH
+- 需要 Node.js 18 或更高版本
 
 ## License
 
