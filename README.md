@@ -1,119 +1,93 @@
 # Influencer CRM Platform (Shell v1)
 
-红人营销全流程管理平台的空壳版，供开发者自行配置后使用。
+红人营销管理工具，帮你管理红人、发邮件、寄样品、算钱、生成合同。
 
-原项目为个人定制版，本仓库已移除所有个人数据、凭证和默认配置，保留完整功能代码。
-
-## 功能
-
-- Outreach 红人库管理、CSV 导入、批量 Gmail 发信
-- Pipeline 寄样管理、状态流转、主页检查
-- Content & Delivery 内容交付、履约率、评级
-- Long-term Partnership 长期合作统计
-- Payment 付费管理、Invoice/Agreement 生成
-- Discovery Instagram 红人发现（Apify）
-- Analytics Gmail 数据统计（可选）
-- Gmail 自动化 自动发信、定时发送、复邀流程（Playwright）
-
-## 环境要求
-
-- Node.js 18+
-- Windows（目前仅测试 Windows）
-- Playwright 浏览器
+这是一个"空壳版"，里面没有任何个人数据，需要你自己配置后才能用。
 
 ## 快速开始
 
-1. 安装依赖：npm install
-2. 安装 Playwright 浏览器：npx playwright install chromium
-3. 启动：start.bat 或 node server.js
-4. 访问：http://localhost:3000/dashboard.html
+第一次用，按顺序做这四步：
 
-## 必须配置的内容
+1. 装 Node.js（去 https://nodejs.org 下载 LTS 版，一路点下一步）
+2. 打开命令行，进到项目文件夹，运行：
+   npm install
+3. 再运行：
+   npx playwright install chromium
+4. 双击 start.bat 启动
 
-空壳版启动后所有配置为空，以下内容需在 Settings 页面或项目根目录自行配置。
+启动后浏览器会自动打开。如果没打开，手动访问 http://localhost:3000/dashboard.html
 
-必填：
+## 需要自己配置的内容
 
-- 品牌列表：Settings 页面
-- 邮件模板：Settings 页面
-- 合同签署人：Settings 页面
+启动后进 Settings 页面，顶部会显示"配置状态"，告诉你哪些还没配。
 
-可选：
+必填（不填就没法用）：
 
-- Apify Token：apify_config.json，Discovery 功能需要
-- Google OAuth：credentials.json + token.json，Analytics 功能需要
+- 邮件模板：告诉程序你有哪些品牌、每个品牌用什么邮件模板
+- 合同签署人：生成合同时签谁的名字
 
-apify_config.json 格式：
+可选（用得到才配）：
 
-{
-  "apiToken": "your_apify_token"
-}
+- Apify Token：想用"红人发现"功能才需要
+- Google 账号授权：想用"数据统计"功能才需要
 
-Google OAuth：参考 Google Cloud 文档获取 credentials.json，首次运行时会自动生成 token.json。
+## 数据存在哪
 
-## 数据文件
+你所有的数据（红人名单、寄样记录、付费记录等）都存在项目文件夹里的 JSON 文件里。
 
-以下文件在使用过程中自动创建，不会被提交到 git：
+文件长这样：
 
-- influencer_data.json 红人库
+- influencer_data.json 红人名单
 - pipeline_data.json 寄样记录
-- cd_data.json 内容交付
+- cd_data.json 内容交付记录
 - payment_data.json 付费记录
 - email_config.json 邮件模板配置
 - contract_config.json 合同签署人
 - tools_config.json 工具列表
 
-建议定期备份这些文件。
+这些文件在你第一次操作时会自动生成，不用手动创建。
 
-## 自动备份
+## 备份（推荐开启）
 
-项目自带三层备份机制。
+程序有三层保护，你的数据不会丢。
 
-### 1. 实时落盘
+第一层：实时保存
+每次你新增、修改、删除数据，程序都会立刻写进文件。关掉浏览器不会丢。
 
-每次操作（增删改）都会立即写入对应的 JSON 文件。关闭浏览器或崩溃不会丢数据。
+第二层：启动快照
+每次打开程序（双击 start.bat），程序会自动把你当前的数据复制一份到 backups/_onstartup/ 文件夹。万一主文件坏了，这里还有一份最近的。
 
-### 2. 启动快照
+第三层：每天自动备份（推荐）
+双击 install-backup-task.bat，程序就会每天凌晨 3 点自动帮你备份一次。备份会保留最近 30 天，超过 30 天的自动删掉，不会占满硬盘。
 
-每次启动 server 时，自动把数据文件备份到 backups/_onstartup/（覆盖式）。保证至少有一个"最近一次启动时"的快照。
+- 想关掉自动备份：双击 uninstall-backup-task.bat
+- 想改备份时间（比如改成早上 8 点）：用记事本打开 install-backup-task.bat，找到 "03:00" 改成 "08:00"，保存后再双击一次
 
-### 3. 定时自动备份（推荐开启）
+## 备份放在哪
 
-双击 install-backup-task.bat，会自动注册 Windows 计划任务：
+所有备份都在项目文件夹里的 backups 文件夹。打开后你会看到：
 
-- 每天凌晨 3:00 运行
-- 备份到 backups/时间戳/
-- 数据文件保留 30 天，超期自动清理
+- 一个带日期的文件夹（比如 20260929_180000），里面是那天的数据
+- _onstartup 文件夹，是启动时自动存的一份
+- _credentials 文件夹，是你的账号凭证（重要！见下）
+- backup.log 是备份日志
 
-卸载：双击 uninstall-backup-task.bat
+## 重要：关于 _credentials 文件夹
 
-修改频率或时间：编辑 install-backup-task.bat 里的 schtasks 那一行，再运行一次。
+_credentials 文件夹里存的是你的账号凭证（Google 授权文件、Apify 密钥）。这些东西非常重要，但绝对不能给别人。
 
-### 备份目录结构
+如果你想把 backups 文件夹同步到网盘或 U 盘做异地备份，请务必：
 
-backups/
-  20260929_180000/        每次定时备份的数据（时间戳目录）
-    influencer_data.json
-    pipeline_data.json
-    ...
-  _onstartup/             启动快照（覆盖式，只有一份）
-  _credentials/           凭证备份（覆盖式，只有一份）
-    credentials.json
-    token.json
-    apify_config.json
-  backup.log              备份日志
+- 只同步带日期的文件夹（数据）
+- 不要同步 _credentials 文件夹
 
-### 关于凭证备份
-
-- 凭证文件（credentials.json / token.json / apify_config.json）单独放在 _credentials/ 子目录
-- 不要把 _credentials/ 分享或同步到网盘/U盘
-- 如果只备份数据文件，可以手动把 _credentials/ 排除，或把 backup.bat 里的 BACKUP_CREDENTIALS 改成 0
+或者，如果你不想让程序备份凭证，可以用记事本打开 backup.bat，找到 BACKUP_CREDENTIALS=1 这一行，改成 BACKUP_CREDENTIALS=0，保存即可。
 
 ## 已知限制
 
-- 仅测试 Windows
-- 网络代理：server.js 默认直连，如需代理请设置环境变量 HTTPS_PROXY
-- Playwright 浏览器路径：默认使用 %USERPROFILE%\AppData\Local\ms-playwright，如需自定义设置环境变量 PLAYWRIGHT_BROWSERS_PATH
+- 目前只在 Windows 上测试过
+- 如果你的电脑需要代理才能访问外网，启动前需要设置环境变量 HTTPS_PROXY（例如 http://127.0.0.1:7897）
+- Playwright 浏览器默认装在 %USERPROFILE%\AppData\Local\ms-playwright，如果你想换位置，设置环境变量 PLAYWRIGHT_BROWSERS_PATH
 
 ## License
 
