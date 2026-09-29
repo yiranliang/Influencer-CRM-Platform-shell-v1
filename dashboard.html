@@ -6604,10 +6604,10 @@
         sampleQtyCache = {};
     }
 
-    // 从 Pipeline 动态获取寄样数量（当月 → 上月 → 上上月... 最多追溯12个月，默认7）
+    // 从 Pipeline 动态获取寄样数量（当月 → 上月 → 上上月... 最多追溯12个月，找不到 Pipeline 数据时返回 0）
     function findSampleQtyForMonth(email, monthKey) {
         if (!email || !monthKey) {
-            return 7;
+            return 0;
         }
 
         // 缓存命中，直接返回
@@ -6652,8 +6652,8 @@
             }
         }
 
-        sampleQtyCache[cacheKey] = 7;
-        return 7;
+        sampleQtyCache[cacheKey] = 0;
+        return 0;
     }
 
     function cdAutoCalc(item) {
@@ -7192,6 +7192,11 @@
                 // 从 Pipeline 动态获取寄样数量
                 var sampleQty = findSampleQtyForMonth(item.email, item.monthKey);
 
+                // ★ 履约率列：Pipeline 无寄样数据（sampleQty=0）时不显示 0%，提示先导入寄样数据
+                var rateCell = (sampleQty > 0)
+                    ? cdFormatRate(item.fulfillmentRate || 0)
+                    : '<span style="color:#94a3b8;" title="请先在 Pipeline 导入寄样数据">未配置寄样数据</span>';
+
                 // ★ 选择具体月份时计算该月评级
                 var monthRating = showRating ? calculateRatingForMonth(item.email, item.monthKey) : '';
 
@@ -7203,7 +7208,7 @@
                     (showRating ? '<td><span class="rating-badge ' + getRatingClass(monthRating) + '">' + monthRating + '</span></td>' : '') +
                     '<td>' + (sampleQty || 0) + '</td>' +
                     '<td>' + (item.totalFulfilledQty || 0) + '</td>' +
-                    '<td>' + cdFormatRate(item.fulfillmentRate || 0) + '</td>' +
+                    '<td>' + rateCell + '</td>' +
                     '<td>' + uniqueUrlsCount + '</td>' +
                     '<td>' + cdFormatViews(avgViews) + '</td>' +
                     '<td>' + (item.totalOrders || 0) + '</td>' +
@@ -7789,10 +7794,21 @@
                             posts: [], isManual: false
                         };
                     }
-                    var viewsStr = vIdx >= 0 ? cols[vIdx]?.trim() : '0';
+                    var viewsStr = vIdx >= 0 ? cols[vIdx]?.trim() : '';
                     var views = 0;
-                    if (/^\d+(\.\d+)?[kK]$/.test(viewsStr)) views = Math.round(parseFloat(viewsStr) * 1000);
-                    else views = parseInt(viewsStr) || 0;
+                    if (viewsStr) {
+                        var num = parseFloat(viewsStr);
+                        if (/[kK]/.test(viewsStr)) {
+                            // 带 k 后缀：按千倍换算（51.1k → 51100）
+                            views = Math.round((isNaN(num) ? 0 : num) * 1000);
+                        } else if (/^\d+\.\d+$/.test(viewsStr)) {
+                            // 无 k 但有小数点：Instagram 约定俗成的 K 计数（51.1 → 51100）
+                            views = Math.round((isNaN(num) ? 0 : num) * 1000);
+                        } else {
+                            // 无 k 无小数点：直接取值（51 → 51）
+                            views = parseInt(viewsStr) || 0;
+                        }
+                    }
                     // 每行 CSV 保留为独立帖子记录（重复链接不合并）
                     groups[key].posts.push({
                         id: 'post_' + i + '_' + Math.random().toString(36).slice(2, 6),
