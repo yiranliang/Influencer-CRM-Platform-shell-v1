@@ -117,8 +117,8 @@
         "orders": 9,
         "cpa": "66.67",
         "paymentStatus": "Paid",
-        "invoiceGenerated": false,
-        "agreementGenerated": false
+        "invoiceGenerated": true,
+        "agreementGenerated": true
       }
     ],
     "createdAt": "2026-09-24T03:13:09.684Z",

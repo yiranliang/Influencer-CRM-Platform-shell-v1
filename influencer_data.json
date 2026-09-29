@@ -56448,7 +56448,7 @@
     "brand": "Aoysky",
     "channel": "Instagram",
     "note": "",
-    "status": "Connected",
+    "status": "Confirm",
     "date": "2026/09/27",
     "favorited": false
   },
@@ -56535,10 +56535,11 @@
     "name": "crucitacampean",
     "brand": "Aoysky",
     "channel": "Instagram",
-    "note": "砍价中",
-    "status": "Confirm",
+    "note": "$600/reel 不议价",
+    "status": "Reject",
     "date": "2026/09/27",
-    "favorited": false
+    "favorited": false,
+    "firstName": ""
   },
   {
     "id": "1785752103827_h3mvjmyx",
@@ -56601,10 +56602,11 @@
     "name": "laurabaezoficial",
     "brand": "Aoysky",
     "channel": "Instagram",
-    "note": "",
-    "status": "Connected",
+    "note": "UGC $800/reel",
+    "status": "Reject",
     "date": "2026/09/27",
-    "favorited": false
+    "favorited": false,
+    "firstName": ""
   },
   {
     "id": "1785752103828_bksnovno",
@@ -56899,7 +56901,7 @@
     "brand": "Aoysky",
     "channel": "Instagram",
     "note": "",
-    "status": "Connected",
+    "status": "sampling",
     "date": "2026/09/27",
     "favorited": false
   },
@@ -57493,7 +57495,7 @@
     "brand": "Aoysky",
     "channel": "Instagram",
     "note": "",
-    "status": "order-pending",
+    "status": "sampling",
     "date": "2026/09/27",
     "favorited": false
   },
@@ -57822,10 +57824,11 @@
     "name": "leasims",
     "brand": "Aoysky",
     "channel": "Instagram",
-    "note": "",
-    "status": "Connected",
+    "note": "UGC 只接受付费",
+    "status": "Reject",
     "date": "2026/09/28",
-    "favorited": false
+    "favorited": false,
+    "firstName": ""
   },
   {
     "id": "1785832893928_89pi647k",
@@ -57988,7 +57991,7 @@
     "brand": "Aoysky",
     "channel": "Instagram",
     "note": "",
-    "status": "Connected",
+    "status": "sampling",
     "date": "2026/09/28",
     "favorited": false
   },
@@ -58078,7 +58081,8 @@
     "note": "",
     "status": "Connected",
     "date": "2026/09/28",
-    "favorited": false
+    "favorited": true,
+    "firstName": "Lindsay"
   },
   {
     "id": "1785922661627_w1mdff6a",
@@ -58628,18 +58632,6 @@
     "status": "Connected",
     "note": "粉丝: 419434 | 分类:  | 来源: im_lola__",
     "id": "1790564472970_fbtjn6yq_lincolnsmamaaa",
-    "favorited": false
-  },
-  {
-    "id": "1790585529930_bl4xfoli",
-    "name": "aaa",
-    "firstName": "judy",
-    "email": "aaa@gmail.com",
-    "brand": "Saodimallsu",
-    "channel": "Instagram",
-    "note": "",
-    "status": "Connected",
-    "date": "2026/09/28",
     "favorited": false
   }
 ]

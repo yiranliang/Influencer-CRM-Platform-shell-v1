@@ -2300,7 +2300,8 @@
             <div id="setting-email" class="setting-panel active" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
                 <h3>邮件模板设置</h3>
                 <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">
-                    配置各品牌发送邮件时的模板名称和默认标题。修改后点击「保存设置」即可生效。
+                    配置各品牌发送邮件时的模板名称和默认标题。修改后点击「保存设置」即可生效。<br>
+                    标题可用 <code>{name}</code> 代表红人渠道 ID，发送时自动替换。例如：<code>Fall collab invite @{name}</code>。
                 </p>
 
                 <div style="overflow-x:auto;">
@@ -2326,6 +2327,21 @@
                 <div style="margin-top:16px;">
                     <button class="btn-primary" onclick="saveEmailConfig()">💾 保存设置</button>
                     <span id="emailConfigStatus" style="margin-left:12px;font-size:13px;color:#94a3b8;"></span>
+                </div>
+            </div>
+
+            <div id="setting-contract" class="setting-panel" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-top:16px;">
+                <h3>合同/发票签署设置</h3>
+                <p style="color:#94a3b8;font-size:13px;margin-bottom:16px;">
+                    此名字用于合同/发票的签名处。
+                </p>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <label for="contractSignerNameInput" style="font-size:13px;color:#475569;">对接人名字</label>
+                    <input type="text" id="contractSignerNameInput" placeholder="如：Stella Leung" style="flex:1;min-width:220px;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                </div>
+                <div style="margin-top:16px;">
+                    <button class="btn-primary" onclick="saveContractConfig()">💾 保存设置</button>
+                    <span id="contractConfigStatus" style="margin-left:12px;font-size:13px;color:#94a3b8;"></span>
                 </div>
             </div>
         </div>
@@ -2631,6 +2647,8 @@
     var editingRowId = null;  // 存储当前编辑行的唯一 ID（避免 DM 同邮箱冲突）
     // 品牌邮件标题配置（从 /api/email-config 加载，可在 Settings 页面中修改）
     var emailConfig = {};
+    // 合同/发票签署人姓名（从 /api/contract-config 加载，可在 Settings 页面中修改）
+    var contractSignerName = 'Stella Leung';
 
     function escHTML(str) { if (!str) return ''; return str.replace(/[&<>]/g, function(m) { if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; return m; }); }
 
@@ -2732,11 +2750,11 @@
                 // 使用默认配置
                 emailConfig = {
                     "Saodimallsu": {
-                        "subject": "A fresh take on fall style – Saodimallsu collab invitation @",
+                        "subject": "A fresh take on fall style – Saodimallsu collab invitation @{name}",
                         "templateName": "首次触达-常规毛衣款"
                     },
                     "Aoysky": {
-                        "subject": "Affordable, chic activewear – Aoysky collab invitation@",
+                        "subject": "Affordable, chic activewear – Aoysky collab invitation @{name}",
                         "templateName": "首次触达-瑜伽款"
                     }
                 };
@@ -2835,7 +2853,7 @@
             }
 
             config[brand] = {
-                subject: subject || '合作邀请 @',
+                subject: subject || '合作邀请 @{name}',
                 templateName: templateName || '首次触达'
             };
         });
@@ -2883,6 +2901,60 @@
             statusEl.textContent = '❌ 保存失败';
             statusEl.style.color = '#ef4444';
             console.error('保存邮件配置失败:', err);
+        });
+    }
+
+    // ── 合同/发票签署人配置 ──
+    function loadContractConfig() {
+        fetch('/api/contract-config')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                contractSignerName = (data && data.signerName) ? data.signerName : 'Stella Leung';
+                console.log('[contract-config] 读取 signerName=' + contractSignerName);
+                renderContractConfigForm();
+            })
+            .catch(function(err) {
+                console.error('加载签署人配置失败:', err);
+                contractSignerName = 'Stella Leung';
+                renderContractConfigForm();
+            });
+    }
+
+    function renderContractConfigForm() {
+        var input = document.getElementById('contractSignerNameInput');
+        if (input) input.value = contractSignerName;
+    }
+
+    function saveContractConfig() {
+        var input = document.getElementById('contractSignerNameInput');
+        var signerName = input ? input.value.trim() : '';
+        var statusEl = document.getElementById('contractConfigStatus');
+        statusEl.textContent = '保存中...';
+        statusEl.style.color = '#94a3b8';
+
+        fetch('/api/contract-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signerName: signerName })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                contractSignerName = data.signerName || 'Stella Leung';
+                statusEl.textContent = '✅ 保存成功';
+                statusEl.style.color = '#22c55e';
+                console.log('[contract-config] 保存 signerName=' + contractSignerName);
+                showToast('签署人配置已保存', 'success');
+            } else {
+                statusEl.textContent = '❌ 保存失败';
+                statusEl.style.color = '#ef4444';
+            }
+            setTimeout(function() { statusEl.textContent = ''; }, 3000);
+        })
+        .catch(function(err) {
+            statusEl.textContent = '❌ 保存失败';
+            statusEl.style.color = '#ef4444';
+            console.error('保存签署人配置失败:', err);
         });
     }
 
@@ -4383,7 +4455,7 @@
         html += '</div>';
         for (var brand in brandGroups) {
             var config = emailConfig[brand] || {};
-            var defaultSubject = config.subject || '合作邀请 @';
+            var defaultSubject = config.subject || '合作邀请 @{name}';
             var templateName = config.templateName || '首次触达';
 
             html += '<div class="form-group">';
@@ -4415,7 +4487,7 @@
         subjectInputs.forEach(function(input) {
             var brand = input.id.substring('subject_'.length);
             var val = input.value.trim();
-            brandSubjects[brand] = val || emailConfig[brand]?.subject || '合作邀请 @';
+            brandSubjects[brand] = val || emailConfig[brand]?.subject || '合作邀请 @{name}';
         });
         var templateInputs = document.querySelectorAll('#brandSubjectsContainer input[id^="template_"]');
         templateInputs.forEach(function(input) {
@@ -4433,7 +4505,7 @@
                 firstName: inf.firstName || '',
                 name: inf.name || inf.email.split('@')[0],
                 brand: brand,
-                subjectTemplate: brandSubjects[brand] || emailConfig[brand]?.subject || '合作邀请 @',
+                subjectTemplate: brandSubjects[brand] || emailConfig[brand]?.subject || '合作邀请 @{name}',
                 templateName: brandTemplates[brand] || emailConfig[brand]?.templateName || '首次触达'
             };
         });
@@ -6281,6 +6353,7 @@
             // 切换到 Settings 时刷新邮件配置
             if (pageName === 'settings') {
                 loadEmailConfig();
+                loadContractConfig();
             }
             // 切换到 Tools 时刷新工具箱
             if (pageName === 'tools') {
@@ -6291,6 +6364,7 @@
 
     loadInfluencers();
     loadEmailConfig();
+    loadContractConfig();
     loadTools();
     refreshAnalytics();
     setInterval(checkAutoStatusUpdate, 24 * 60 * 60 * 1000);
@@ -9448,7 +9522,7 @@
         h += '<div style="margin:8px 0;"><span class="b">Post link:</span><br>'+(data.Post_Link||'N/A')+'</div>';
         h += '<div style="margin:12px 0;font-weight:700;font-size:12pt;">Total amount: '+data.Fee+' USD</div>';
         h += '<div class="divider"></div>';
-        h += '<div class="sig-sec"><div class="sig-row"><span class="b">Influencer\'s Signature:</span><span class="sig-ln"></span></div><div class="sig-row"><span class="b">Contact\'s Signature:</span><span class="ink">Stella Leung</span></div></div>';
+        h += '<div class="sig-sec"><div class="sig-row"><span class="b">Influencer\'s Signature:</span><span class="sig-ln"></span></div><div class="sig-row"><span class="b">Contact\'s Signature:</span><span class="ink">' + contractSignerName + '</span></div></div>';
         return h;
     }
 
@@ -9483,10 +9557,10 @@
         h += '<h2>Indemnification/Limitation of Liability</h2><p>Each Party will defend, indemnify and hold harmless the other Party, and their respective directors, officers, attorneys, agents, employees, service providers and assigns (collectively, "Protected Parties") from and against all claims, liabilities, suits, losses, damages and expenses, including costs and reasonable attorney\'s fees, relating to or resulting from such Party\'s willful misconduct, negligence, or breach of this Agreement, any violation of applicable law or on any matter related to taxes or fees, or as to Influencer, any claims that the Deliverables violate any rights of any third party. Neither Party will be liable for any indirect, punitive, consequential or other similar damages. In addition, ZIBUYU will defend, indemnify, and hold Influencer, its affiliates and each of their respective officers, employees, affiliates and agents harmless from and against all liabilities related to or arising from ZIBUYU\'s Marks, and ZIBUYU\'s products or service. IN NO EVENT SHALL EITHER PARTY BE LIABLE TO THE OTHER FOR ANY SPECIAL, INCIDENTAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES ARISING OUT OF THIS AGREEMENT OR ITS TERMINATION, WHETHER LIABILITY IS ASSERTED IN CONTRACT, TORT (INCLUDING NEGLIGENCE), STRICT LIABILITY, OR OTHERWISE AND IRRESPECTIVE OF WHETHER SUCH PARTY HAS BEEN ADVISED OF THE POSSIBILITY OF ANY SUCH LOSS OR DAMAGE. The foregoing limitation does not apply to either Party\'s breach of confidentiality obligations hereunder.</p>';
         h += '<h2>Termination for Material Breach</h2><p>This Agreement may be terminated by either party upon written notice to the other party in the event of a material breach by the other party that is not cured within thirty (30) days after written notice of such breach is given to the breaching party, violation of any laws or regulations governing this Agreement, or any act that brings or could bring the other party into disrepute or affects adversely the reputation of the other party. Upon termination of this Agreement for material breach Influencer shall be entitled to compensation on a pro rata basis for services satisfactorily performed up to the date of termination, provided that such services were in compliance with all terms of this Agreement. Payment of the pro rata compensation will be made within thirty (30) days of the effective date of termination, subject to receipt of a final invoice from Influencer.</p>';
         h += '<h2>Governing Law</h2><p>This Agreement shall be governed by, construed, and enforced in accordance with the laws of the State of New York, without giving effect to any conflicts of law provisions. Any controversy or claim arising out of or relating to this Agreement, or the breach thereof, shall first be subject to good-faith negotiation between the Parties for a period of thirty (30) days. If the dispute is not resolved through negotiation, it shall be determined by arbitration administered by the Hong Kong International Arbitration Centre (HKIAC) under the HKIAC Administered Arbitration Rules in force at the time. The seat of arbitration shall be Hong Kong. The arbitration shall be conducted in English. The tribunal shall consist of one (1) arbitrator. Each Party shall bear its own costs of arbitration, and the arbitrator\'s fees shall be shared equally unless the tribunal orders otherwise.</p>';
-        h += '<h2>Signature</h2><p>This Agreement shall be signed by Instagram influencer <strong>'+data.Name+'('+data.Email+')</strong> and Stella Leung, on behalf of <strong>ZIBUYU INTERNATIONAL LIMITED (EN.ZBYCORP.COM)</strong>.</p>';
+        h += '<h2>Signature</h2><p>This Agreement shall be signed by Instagram influencer <strong>'+data.Name+'('+data.Email+')</strong> and ' + contractSignerName + ', on behalf of <strong>ZIBUYU INTERNATIONAL LIMITED (EN.ZBYCORP.COM)</strong>.</p>';
         h += '<div style="display:flex;justify-content:space-between;margin-top:20px;">';
         h += '<div style="flex:1;padding-right:20px;"><div style="font-weight:700;font-size:12pt;margin-bottom:8px;">'+data.Name+'('+data.Email+')</div><div><strong>Name:</strong> '+data.Name+'</div><div><strong>Date:</strong> ____________________</div><div><strong>Signature:</strong> ____________________</div></div>';
-        h += '<div style="flex:1;padding-left:20px;border-left:1px solid #ccc;"><div style="font-weight:700;font-size:12pt;margin-bottom:8px;">ZIBUYU INTERNATIONAL LIMITED</div><div><strong>Name:</strong> Stella Leung</div><div><strong>Date:</strong> '+data.Date+'</div><div style="display:flex;align-items:center;gap:6px;"><strong>Signature:</strong><span style="font-family:Ink Free,cursive;font-size:16pt;">Stella Leung</span></div></div></div>';
+        h += '<div style="flex:1;padding-left:20px;border-left:1px solid #ccc;"><div style="font-weight:700;font-size:12pt;margin-bottom:8px;">ZIBUYU INTERNATIONAL LIMITED</div><div><strong>Name:</strong> ' + contractSignerName + '</div><div><strong>Date:</strong> '+data.Date+'</div><div style="display:flex;align-items:center;gap:6px;"><strong>Signature:</strong><span style="font-family:Ink Free,cursive;font-size:16pt;">' + contractSignerName + '</span></div></div></div>';
         h += '<div class="footer">Generated on '+data.Date+'</div></body></html>';
         return h;
     }
@@ -9586,7 +9660,7 @@
             makePar([tb("Influencer's Signature:")]),
             makePar([t('  ________________________')],{spacing:{after:150}}),
             makePar([tb("Contact's Signature:")]),
-            makePar([t('  '),t('Stella Leung',{bold:true,size:32,font:'Ink Free'})])
+            makePar([t('  '),t(contractSignerName,{bold:true,size:32,font:'Ink Free'})])
         ];
         return new D.Document({sections:[{children:sec}]});
     }
@@ -9655,15 +9729,15 @@
             h2('Governing Law'),
             p([t('This Agreement shall be governed by, construed, and enforced in accordance with the laws of the State of New York, without giving effect to any conflicts of law provisions. Any controversy or claim arising out of or relating to this Agreement, or the breach thereof, shall first be subject to good-faith negotiation between the Parties for a period of thirty (30) days. If the dispute is not resolved through negotiation, it shall be determined by arbitration administered by the Hong Kong International Arbitration Centre (HKIAC) under the HKIAC Administered Arbitration Rules in force at the time. The seat of arbitration shall be Hong Kong. The arbitration shall be conducted in English. The tribunal shall consist of one (1) arbitrator. Each Party shall bear its own costs of arbitration, and the arbitrator\'s fees shall be shared equally unless the tribunal orders otherwise.')],{spacing:{after:200}}),
             h2('Signature'),
-            p([t('This Agreement shall be signed by Instagram influencer '),b(data.Name+'('+data.Email+')'),t(' and Stella Leung, on behalf of '),b('ZIBUYU INTERNATIONAL LIMITED (EN.ZBYCORP.COM)'),t('.')],{spacing:{after:200}}),
+            p([t('This Agreement shall be signed by Instagram influencer '),b(data.Name+'('+data.Email+')'),t(' and '+contractSignerName+', on behalf of '),b('ZIBUYU INTERNATIONAL LIMITED (EN.ZBYCORP.COM)'),t('.')],{spacing:{after:200}}),
             p([b(data.Name+'('+data.Email+')')],{spacing:{after:50}}),
             p([t('Name: '+data.Name)],{spacing:{after:50}}),
             p([t('Date: ____________________')],{spacing:{after:50}}),
             p([t('Signature: ____________________')],{spacing:{after:300}}),
             p([b('ZIBUYU INTERNATIONAL LIMITED and EN.ZBYCORP.COM')],{spacing:{after:50}}),
-            p([t('Name: Stella Leung')],{spacing:{after:50}}),
+            p([t('Name: '+contractSignerName)],{spacing:{after:50}}),
             p([t('Date: '+data.Date)],{spacing:{after:50}}),
-            p([t('Signature: '),t('Stella Leung',{bold:true,size:32,font:'Ink Free'})])
+            p([t('Signature: '),t(contractSignerName,{bold:true,size:32,font:'Ink Free'})])
         ];
         return new D.Document({sections:[{children:ch}]});
     }

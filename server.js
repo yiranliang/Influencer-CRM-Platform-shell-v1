@@ -18,6 +18,7 @@ const PIPELINE_DATA_FILE = path.join(__dirname, 'pipeline_data.json');
 const CD_DATA_FILE = path.join(__dirname, 'cd_data.json');
 const PAYMENT_DATA_FILE = path.join(__dirname, 'payment_data.json');
 const EMAIL_CONFIG_FILE = path.join(__dirname, 'email_config.json');
+const CONTRACT_CONFIG_FILE = path.join(__dirname, 'contract_config.json');
 const TOOLS_CONFIG_FILE = path.join(__dirname, 'tools_config.json');
 const HOMEPAGE_CHECK_FILE = path.join(__dirname, 'pipeline_homepage_check.json');
 
@@ -427,7 +428,7 @@ function createServer() {
         name: r.name || (r.email ? r.email.split('@')[0] : ''),
         firstName: r.firstName || '',
         brand: r.brand || 'Saodimallsu',
-        subjectTemplate: r.subjectTemplate || '合作邀请 @',
+        subjectTemplate: r.subjectTemplate || '合作邀请 @{name}',
         templateName: r.templateName || ''
       }));
 
@@ -453,13 +454,13 @@ function createServer() {
           const r = processedRecipients[i];
           const templateName = r.templateName || BRAND_TEMPLATES[r.brand] || '首次触达-常规毛衣款';
 
-          // 标题中的 @ 替换为红人姓名
+          // 标题中的 {name} 占位符替换为红人渠道 id（name 字段）
           let subject = r.subjectTemplate;
-          if (subject.includes('@') && r.name) {
-            subject = subject.replace('@', '@' + r.name);
+          if (subject.includes('{name}')) {
+            subject = subject.replaceAll('{name}', r.name);
           }
 
-          console.log(`[send-emails] [${i + 1}/${processedRecipients.length}] ${r.email} | ${r.brand} | "${subject.substring(0, 50)}"`);
+          console.log(`[send-emails] [${i + 1}/${processedRecipients.length}] ${r.email} | ${r.brand} | 最终标题="${subject}"`);
 
           try {
             await automation.sendSingleEmail(r.email, r.name, templateName, subject, finalScheduleTime, r.firstName);
@@ -1147,11 +1148,11 @@ function createServer() {
       } else {
         const defaultConfig = {
           'Saodimallsu': {
-            'subject': 'A fresh take on fall style – Saodimallsu collab invitation @',
+            'subject': 'A fresh take on fall style – Saodimallsu collab invitation @{name}',
             'templateName': '首次触达-常规毛衣款'
           },
           'Aoysky': {
-            'subject': 'Affordable, chic activewear – Aoysky collab invitation@',
+            'subject': 'Affordable, chic activewear – Aoysky collab invitation @{name}',
             'templateName': '首次触达-瑜伽款'
           }
         };
@@ -1174,6 +1175,41 @@ function createServer() {
         sendJSON(res, 200, { success: true });
       } catch (err) {
         console.error('[email-config] POST error:', err.message);
+        sendJSON(res, 500, { error: err.message });
+      }
+    }).catch(err => sendJSON(res, 400, { error: err.message }));
+    return;
+  }
+
+  // GET /api/contract-config — 返回合同/发票签署人配置
+  if (pathname === '/api/contract-config' && req.method === 'GET') {
+    try {
+      let data = { signerName: 'Stella Leung' };
+      if (fs.existsSync(CONTRACT_CONFIG_FILE)) {
+        data = JSON.parse(fs.readFileSync(CONTRACT_CONFIG_FILE, 'utf8'));
+      } else {
+        fs.writeFileSync(CONTRACT_CONFIG_FILE, JSON.stringify(data, null, 2));
+      }
+      console.log('[contract-config] GET signerName=' + (data.signerName || ''));
+      sendJSON(res, 200, data);
+    } catch (err) {
+      console.error('[contract-config] GET error:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/contract-config — 保存合同/发票签署人配置
+  if (pathname === '/api/contract-config' && req.method === 'POST') {
+    parseBody(req).then(body => {
+      try {
+        const signerName = (body && typeof body.signerName === 'string') ? body.signerName.trim() : '';
+        const config = { signerName: signerName || 'Stella Leung' };
+        fs.writeFileSync(CONTRACT_CONFIG_FILE, JSON.stringify(config, null, 2));
+        console.log('[contract-config] 保存成功 signerName=' + config.signerName);
+        sendJSON(res, 200, { success: true, signerName: config.signerName });
+      } catch (err) {
+        console.error('[contract-config] POST error:', err.message);
         sendJSON(res, 500, { error: err.message });
       }
     }).catch(err => sendJSON(res, 400, { error: err.message }));

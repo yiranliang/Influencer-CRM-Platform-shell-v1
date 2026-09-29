@@ -1,10 +1,10 @@
 {
   "Saodimallsu": {
-    "subject": "A fresh take on fall style – Saodimallsu collab invitation @",
+    "subject": "A fresh take on fall style – Saodimallsu collab invitation x {name}",
     "templateName": "首次触达-常规毛衣款"
   },
   "Aoysky": {
-    "subject": "Affordable, chic activewear – Aoysky collab invitation @",
+    "subject": "Affordable, chic activewear – Aoysky collab invitation @{name}",
     "templateName": "首次触达-瑜伽款"
   }
 }

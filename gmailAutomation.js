@@ -1332,9 +1332,9 @@ async _handleInsertFilesDialog() {
   // ─── 标题生成 ──────────────────────────────────
 
   generateSubject(subjectTemplate, name) {
-    if (!subjectTemplate || !name) return subjectTemplate || '';
-    if (subjectTemplate.includes('@')) {
-      return subjectTemplate.replace('@', `@${name}`);
+    if (!subjectTemplate) return subjectTemplate || '';
+    if (subjectTemplate.includes('{name}')) {
+      return subjectTemplate.replaceAll('{name}', name || '');
     }
     return subjectTemplate;
   }
