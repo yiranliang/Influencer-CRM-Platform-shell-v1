@@ -2631,6 +2631,35 @@
 </div>
 
 <script>
+    // ── Storage 访问保护（localStorage 不可用时降级为内存对象）──
+    // 某些上下文（file://、沙箱 iframe、隐私模式等）访问 localStorage 会抛
+    // "Access to storage is not allowed from this context"，并中断后续脚本。
+    // 这里先探测可用性；不可用时降级为内存 Map，保证所有读写永不抛错、页面能正常跑。
+    function __safeMakeMemoryStorage() {
+        var mem = {};
+        return {
+            getItem: function(k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+            setItem: function(k, v) { mem[k] = String(v); },
+            removeItem: function(k) { delete mem[k]; }
+        };
+    }
+    function __safeProbeStorage(name) {
+        try {
+            var s = name === 'session' ? window.sessionStorage : window.localStorage;
+            if (!s) return null;
+            var probe = '__storage_probe__';
+            s.setItem(probe, '1');
+            s.removeItem(probe);
+            return s;
+        } catch (e) {
+            return null;
+        }
+    }
+    var __safeLocal = __safeProbeStorage('local') || __safeMakeMemoryStorage();
+    function safeGet(key) { try { return __safeLocal.getItem(key); } catch (e) { return null; } }
+    function safeSet(key, val) { try { __safeLocal.setItem(key, val); } catch (e) { /* 静默 */ } }
+    function safeRemove(key) { try { __safeLocal.removeItem(key); } catch (e) { /* 静默 */ } }
+
     var allInfluencers = [], filteredInfluencers = [], currentPage = 1, pageSize = 20, activeStatuses = [], activeBrands = [], activeChannels = [];
     var selectedInfluencerIds = new Set();  // 跨页保持勾选状态，存储唯一 id
     var isTodayFilterActive = false;  // ★ 记录「只看今日」是否激活
@@ -6753,6 +6782,15 @@
             // totalOrders（同步取的就是这个字段），几个 fixXxx() 则修履约数/直播数/12月数据，
             // 都改完再同步，拿到的才是最终值。
             if (typeof syncPaymentFromCD === 'function') syncPaymentFromCD();
+
+            // C&D 就绪后重新渲染 Payment：出单列是现算的（calcPaymentSummary 直接读 cdData），
+            // 首次渲染时 cdData 还没到位会整列「暂无数据」；而 syncPaymentFromCD 只在 orders/cpa
+            // 有变化时才 renderPaymentTable（值恰好一致时不动），所以这里无条件补一次重画，
+            // 保证无论 loadPaymentData / loadCD 谁先返回，cdData 就绪后出单数都能正确显示。
+            if (paymentData && paymentData.length > 0) {
+                console.log('C&D 就绪，重新渲染 Payment');
+                renderPaymentTable();
+            }
         }).catch(function(err) { console.error('CD加载失败:', err); });
     }
 
@@ -8706,14 +8744,14 @@
                 } else {
                     // 尝试从 localStorage 迁移
                     try {
-                        var stored = localStorage.getItem('paymentData');
+                        var stored = safeGet('paymentData');
                         if (stored) {
                             paymentData = JSON.parse(stored);
                             // 先迁移再落盘：原来 savePaymentData() 排在迁移前面，
                             // 会把记录级旧结构原样写回后端，下一轮又得再迁一次
                             migratePaymentToCollaborations();
                             savePaymentData();
-                            localStorage.removeItem('paymentData');
+                            safeRemove('paymentData');
                             console.log('[Payment] 数据已从 localStorage 迁移到后端');
                         } else { paymentData = []; }
                     } catch (e) { paymentData = []; }
