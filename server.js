@@ -1265,10 +1265,48 @@ function createServer() {
 
 }
 
+// ── 启动快照备份 ──
+// 每次 server 启动时，把数据文件复制到 backups/_onstartup/（覆盖式）
+// 目的：保证至少有一个"最近启动时的快照"，防止数据文件意外损坏
+// 注意：不含凭证文件（credentials / token / apify_config），凭证走 backup.bat 的计划任务
+function runStartupBackup() {
+  try {
+    const dataFiles = [
+      'cd_data.json',
+      'influencer_data.json',
+      'payment_data.json',
+      'pipeline_data.json',
+      'email_config.json',
+      'contract_config.json',
+      'tools_config.json',
+      'pipeline_homepage_check.json'
+    ];
+    const backupDir = path.join(__dirname, 'backups', '_onstartup');
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    let copied = 0;
+    for (const file of dataFiles) {
+      const src = path.join(__dirname, file);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, path.join(backupDir, file));
+        copied++;
+      }
+    }
+    console.log('[startup-backup] ' + copied + ' data file(s) snapshotted to backups/_onstartup/');
+  } catch (err) {
+    console.error('[startup-backup] failed:', err.message);
+    // 不阻塞启动
+  }
+}
+
 function startServer(port) {
   const server = createServer();
   server.listen(port, () => {
     console.log(`AI Workflow 2.0 server running at http://localhost:${port}`);
+
+    // 启动快照：把数据文件覆盖式备份到 backups/_onstartup/
+    runStartupBackup();
 
     // 测试环境可用 NO_AUTO_OPEN=1 跳过自动打开浏览器（正常启动不受影响）
     if (process.env.NO_AUTO_OPEN !== '1') {
