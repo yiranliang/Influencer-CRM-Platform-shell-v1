@@ -2994,6 +2994,102 @@
         });
     }
 
+    // ── Apify Token 配置 ──
+    function loadApifyConfig() {
+        fetch('/api/apify-config')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                // 已配置则收起输入框（显示「已配置 + 修改」），未配置则展开输入框
+                var wrap = document.getElementById('apifyTokenInputWrap');
+                if (wrap) wrap.style.display = (data && data.configured) ? 'none' : '';
+            })
+            .catch(function(err) { console.error('加载 Apify 配置失败:', err); });
+    }
+
+    function showApifyTokenInput() {
+        var wrap = document.getElementById('apifyTokenInputWrap');
+        if (wrap) wrap.style.display = '';
+    }
+
+    function saveApifyConfig() {
+        var input = document.getElementById('apifyTokenInput');
+        var apiToken = input ? input.value.trim() : '';
+        var statusEl = document.getElementById('apifyConfigStatus');
+        if (!apiToken) {
+            if (statusEl) { statusEl.textContent = '请输入 Token'; statusEl.style.color = '#ef4444'; }
+            return;
+        }
+        if (statusEl) { statusEl.textContent = '保存中...'; statusEl.style.color = '#94a3b8'; }
+        fetch('/api/apify-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ apiToken: apiToken })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data.success) {
+                if (statusEl) { statusEl.textContent = '✅ 已保存，重启程序生效'; statusEl.style.color = '#22c55e'; }
+                // 刷新配置状态卡片，让「未配置」变成「已配置」
+                loadConfigStatus();
+            } else {
+                if (statusEl) { statusEl.textContent = '❌ 保存失败'; statusEl.style.color = '#ef4444'; }
+            }
+        })
+        .catch(function(err) {
+            console.error('保存 Apify Token 失败:', err);
+            if (statusEl) { statusEl.textContent = '❌ 保存失败'; statusEl.style.color = '#ef4444'; }
+        });
+    }
+
+    // ── Gmail 凭据上传 ──
+    function loadGmailCredentials() {
+        fetch('/api/gmail-credentials')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                // 配置状态由 renderConfigStatus 统一渲染，这里 GET 一次后刷新整张卡片
+                loadConfigStatus();
+            })
+            .catch(function(err) { console.error('加载 Gmail 凭据状态失败:', err); });
+    }
+
+    function uploadGmailCredentials() {
+        // 触发隐藏的文件选择器
+        var fileInput = document.getElementById('gmailCredentialsFile');
+        if (fileInput) fileInput.click();
+    }
+
+    function handleGmailCredentialsFile(file) {
+        if (!file) return;
+        var statusEl = document.getElementById('gmailCredentialsStatus');
+        if (statusEl) { statusEl.textContent = '上传中...'; statusEl.style.color = '#94a3b8'; }
+        var reader = new FileReader();
+        reader.onload = function() {
+            var content = reader.result;
+            fetch('/api/gmail-credentials', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (statusEl) { statusEl.textContent = '✅ 已保存，重启程序生效'; statusEl.style.color = '#22c55e'; }
+                    loadConfigStatus();
+                } else {
+                    if (statusEl) { statusEl.textContent = '❌ 文件格式不对，请确认是 Google Cloud Console 下载的 credentials.json'; statusEl.style.color = '#ef4444'; }
+                }
+            })
+            .catch(function(err) {
+                console.error('上传 Gmail 凭据失败:', err);
+                if (statusEl) { statusEl.textContent = '❌ 上传失败'; statusEl.style.color = '#ef4444'; }
+            });
+        };
+        reader.onerror = function() {
+            if (statusEl) { statusEl.textContent = '❌ 读取文件失败'; statusEl.style.color = '#ef4444'; }
+        };
+        reader.readAsText(file);
+    }
+
     // ── 配置状态卡片 ──
     function loadConfigStatus() {
         fetch('/api/config-status')
@@ -3018,9 +3114,10 @@
                 + '1. 打开 https://console.apify.com/sign-up 注册账号（免费）\n'
                 + '2. 登录后点右上角头像 → Settings → Integrations\n'
                 + '3. 复制页面上的 Personal API token\n'
-                + '4. 在项目文件夹里新建文件 apify_config.json\n'
-                + '5. 内容粘贴：{\"apiToken\": \"你的token\"}\n'
-                + '6. 保存，重启程序（关闭黑窗口，重新双击 start.bat）\n\n'
+                + '4. 回到本页「配置状态」的 Apify Token 行，把 Token 粘贴进输入框\n'
+                + '5. 点击「保存」\n'
+                + '6. 重启程序（关闭黑窗口，重新双击 start.bat）\n\n'
+                + 'Token 会保存在项目文件夹的 apify_config.json，请勿分享此文件。\n'
                 + '配置完成后，本页刷新即可看到"已配置"。';
         } else if (type === 'gmail') {
             title = 'Gmail OAuth 设置说明（可选）';
@@ -3031,9 +3128,9 @@
                 + '2. 新建一个项目\n'
                 + '3. 在「API 和服务」中启用 Gmail API\n'
                 + '4. 在「凭据」中创建 OAuth 客户端 ID（类型选「桌面应用」）\n'
-                + '5. 下载 JSON 文件，重命名为 credentials.json\n'
-                + '6. 放到本项目文件夹下\n'
-                + '7. 重启程序，首次运行时浏览器会弹出授权\n\n'
+                + '5. 下载 JSON 文件\n'
+                + '6. 在 Settings 的 Gmail OAuth 那行点「上传 credentials.json」按钮，选择刚下载的文件\n'
+                + '7. 保存后重启程序，首次运行时浏览器会弹出授权\n\n'
                 + '如果以上步骤看不懂，建议先跳过，或找开发者帮忙。';
         } else {
             title = '说明';
@@ -3048,14 +3145,56 @@
         var body = document.getElementById('configStatusBody');
         if (!body) return;
         var items = [
-            { key: 'gmailOAuth', label: 'Gmail OAuth', hint: '将 credentials.json 放到项目根目录（可选功能，Analytics 需要）', help: 'gmail' },
-            { key: 'apifyToken', label: 'Apify Token', hint: '在项目根目录创建 apify_config.json，填入 apiToken（Discovery 需要）', help: 'apify' },
+            { key: 'gmailOAuth', label: 'Gmail OAuth', hint: '上传 Google Cloud Console 下载的 credentials.json（可选功能，Analytics 需要）', help: 'gmail' },
+            { key: 'apifyToken', label: 'Apify Token', hint: '红人发现（Discovery）需要', help: 'apify' },
             { key: 'emailTemplates', label: '邮件模板', hint: '在下方「邮件模板设置」中新增品牌并配置模板' },
             { key: 'contractSigner', label: '合同签署人', hint: '在「合同/发票签署设置」中填写对接人名字' }
         ];
         var html = '<table style="width:100%;border-collapse:collapse;">';
         items.forEach(function(it) {
             var ok = !!data[it.key];
+            // ── Gmail OAuth 行特殊处理：上传 credentials.json（未配置「上传」，已配置「重新上传」）──
+            if (it.key === 'gmailOAuth') {
+                var gmailBadge = ok
+                    ? '<span style="color:#22c55e;font-weight:600;">✅ 已配置</span>'
+                    : '<span style="color:#ef4444;font-weight:600;">❌ 未配置</span>';
+                gmailBadge += ' <a href="javascript:void(0)" onclick="showConfigHelp(\'gmail\')" style="color:#3b82f6;font-size:12px;text-decoration:underline;margin-left:8px;">查看详细说明 →</a>';
+                var gmailBtn = ok
+                    ? '<button class="btn-secondary" onclick="uploadGmailCredentials()" style="white-space:nowrap;">重新上传</button>'
+                    : '<button class="btn-primary" onclick="uploadGmailCredentials()" style="white-space:nowrap;">上传 credentials.json</button>';
+                var gmailWrap = '<div style="display:flex;gap:8px;align-items:center;margin-top:6px;">'
+                    + gmailBtn
+                    + '<input type="file" id="gmailCredentialsFile" accept=".json,application/json" style="display:none;" onchange="handleGmailCredentialsFile(this.files[0])">'
+                    + '<span id="gmailCredentialsStatus" style="font-size:13px;color:#94a3b8;"></span>'
+                    + '</div>'
+                    + '<div style="color:#94a3b8;font-size:12px;margin-top:4px;">⚠️ credentials.json 含敏感信息，请勿分享此文件</div>';
+                html += '<tr style="border-bottom:1px solid #f1f5f9;">'
+                    + '<td style="padding:10px 12px 10px 0;width:140px;font-weight:500;color:#334155;">' + it.label + '</td>'
+                    + '<td style="padding:10px 0;">' + gmailBadge + gmailWrap + '</td>'
+                    + '</tr>';
+                return;
+            }
+            // ── Apify Token 行特殊处理：未配置直接显示输入框，已配置显示「修改」链接可展开 ──
+            if (it.key === 'apifyToken') {
+                var tokenBadge = ok
+                    ? '<span style="color:#22c55e;font-weight:600;">✅ 已配置</span>'
+                      + ' <a href="javascript:void(0)" onclick="showApifyTokenInput()" style="color:#3b82f6;font-size:12px;text-decoration:underline;margin-left:8px;">修改</a>'
+                    : '<span style="color:#ef4444;font-weight:600;">❌ 未配置</span>';
+                tokenBadge += ' <a href="javascript:void(0)" onclick="showConfigHelp(\'apify\')" style="color:#3b82f6;font-size:12px;text-decoration:underline;margin-left:8px;">查看详细说明 →</a>';
+                var tokenWrap = '<div id="apifyTokenInputWrap" style="' + (ok ? 'display:none;' : '') + 'margin-top:8px;">'
+                    + '<div style="display:flex;gap:8px;align-items:center;">'
+                    + '<input type="password" id="apifyTokenInput" placeholder="粘贴 Apify Personal API Token" style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">'
+                    + '<button class="btn-primary" onclick="saveApifyConfig()" style="white-space:nowrap;">保存</button>'
+                    + '<span id="apifyConfigStatus" style="font-size:13px;color:#94a3b8;"></span>'
+                    + '</div>'
+                    + '<div style="color:#94a3b8;font-size:12px;margin-top:4px;">⚠️ Token 保存在项目文件夹的 apify_config.json，请勿分享此文件</div>'
+                    + '</div>';
+                html += '<tr style="border-bottom:1px solid #f1f5f9;">'
+                    + '<td style="padding:10px 12px 10px 0;width:140px;font-weight:500;color:#334155;">' + it.label + '</td>'
+                    + '<td style="padding:10px 0;">' + tokenBadge + tokenWrap + '</td>'
+                    + '</tr>';
+                return;
+            }
             var badge = ok
                 ? '<span style="color:#22c55e;font-weight:600;">✅ 已配置</span>'
                 : '<span style="color:#ef4444;font-weight:600;">❌ 未配置</span>';
@@ -6568,6 +6707,8 @@
                 loadContractConfig();
                 loadConfigStatus();
                 loadProxyConfig();
+                loadApifyConfig();
+                loadGmailCredentials();
             }
             // 切换到 Tools 时刷新工具箱
             if (pageName === 'tools') {

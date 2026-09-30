@@ -1221,7 +1221,86 @@ function createServer() {
     return;
   }
 
-  // GET /api/config-status 鈥?杩斿洖鍚勯厤缃」鐨勫瓨鍦ㄧ姸鎬侊紝渚涘墠绔睍绀?
+  // GET /api/apify-config — 读取 Apify Token 是否已配置（不返回 token 本体，避免泄露）
+  if (pathname === '/api/apify-config' && req.method === 'GET') {
+    try {
+      let configured = false;
+      const cfgPath = path.join(__dirname, 'apify_config.json');
+      if (fs.existsSync(cfgPath)) {
+        const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+        configured = !!(cfg.apiToken && String(cfg.apiToken).trim());
+      }
+      sendJSON(res, 200, { configured });
+    } catch (err) {
+      console.error('[apify-config] GET error:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/apify-config — 保存 Apify Token（写入 apify_config.json，重启后生效）
+  if (pathname === '/api/apify-config' && req.method === 'POST') {
+    parseBody(req).then((body) => {
+      try {
+        const apiToken = (body && typeof body.apiToken === 'string') ? body.apiToken.trim() : '';
+        const cfgPath = path.join(__dirname, 'apify_config.json');
+        // 写入格式与启动时读取逻辑一致：{ "apiToken": "xxx" }
+        fs.writeFileSync(cfgPath, JSON.stringify({ apiToken }, null, 2), 'utf8');
+        // 日志不打印 token 本体（安全），只打印是否已填写
+        console.log('[apify-config] saved apiToken=' + (apiToken ? '(已填写)' : '(空)'));
+        sendJSON(res, 200, { success: true, needRestart: true });
+      } catch (err) {
+        console.error('[apify-config] POST error:', err.message);
+        sendJSON(res, 500, { error: err.message });
+      }
+    });
+    return;
+  }
+
+  // GET /api/gmail-credentials — 读取 Gmail OAuth 凭据是否已配置（credentials.json 是否存在）
+  if (pathname === '/api/gmail-credentials' && req.method === 'GET') {
+    try {
+      const configured = fs.existsSync(path.join(__dirname, 'credentials.json'));
+      sendJSON(res, 200, { configured });
+    } catch (err) {
+      console.error('[gmail-credentials] GET error:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/gmail-credentials — 上传并保存 Gmail OAuth 凭据（写入 credentials.json，重启后生效）
+  if (pathname === '/api/gmail-credentials' && req.method === 'POST') {
+    parseBody(req).then((body) => {
+      try {
+        const content = (body && typeof body.content === 'string') ? body.content : '';
+        // 校验 1：必须是合法 JSON
+        let parsed;
+        try {
+          parsed = JSON.parse(content);
+        } catch (e) {
+          sendJSON(res, 400, { success: false, error: '文件格式不对' });
+          return;
+        }
+        // 校验 2：Google OAuth 客户端凭据格式（含 installed 或 web 字段）
+        if (!parsed || typeof parsed !== 'object' || (!parsed.installed && !parsed.web)) {
+          sendJSON(res, 400, { success: false, error: '文件格式不对' });
+          return;
+        }
+        const cfgPath = path.join(__dirname, 'credentials.json');
+        // 原样写入（UTF-8）；日志不打印内容（含敏感信息）
+        fs.writeFileSync(cfgPath, content, 'utf8');
+        console.log('[gmail-credentials] saved（已保存，不打印内容）');
+        sendJSON(res, 200, { success: true, needRestart: true });
+      } catch (err) {
+        console.error('[gmail-credentials] POST error:', err.message);
+        sendJSON(res, 500, { error: err.message });
+      }
+    });
+    return;
+  }
+
+  // GET /api/config-status — 返回各项配置的存在状态，供前端展示
   if (pathname === '/api/config-status' && req.method === 'GET') {
     try {
       // Gmail OAuth
