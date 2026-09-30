@@ -23,6 +23,9 @@ try {
   console.error('[proxy] failed to read proxy_config.json:', e.message);
 }
 if (PROXY_URL) {
+  // 同时设环境变量，让 googleapis 等库也能走代理（它们不认 undici 的 dispatcher）
+  process.env.HTTPS_PROXY = PROXY_URL;
+  process.env.HTTP_PROXY = PROXY_URL;
   setGlobalDispatcher(new ProxyAgent(PROXY_URL));
   console.log('[proxy] using proxy:', PROXY_URL);
 } else {
