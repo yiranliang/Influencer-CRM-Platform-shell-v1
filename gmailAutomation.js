@@ -208,7 +208,7 @@ class GmailAutomation extends EventEmitter {
 
   // ─── 单封邮件 ────────────────────────────────────
 
-  async sendSingleEmail(email, name, templateName, subject, scheduleTime, firstName) {
+  async sendSingleEmail(email, name, templateName, subject, scheduleTime, firstName, mode = 'today') {
     // 整个发送流程的总超时保护（2 分钟），防止任一环节卡住导致无限等待
     const TIMEOUT_MS = 120000;
     let timer;
@@ -221,14 +221,17 @@ class GmailAutomation extends EventEmitter {
         fn(val);
       };
       timer = setTimeout(() => done(reject, new Error('发送流程超时（2 分钟），已中止')), TIMEOUT_MS);
-      this._sendSingleEmailCore(email, name, templateName, subject, scheduleTime, firstName)
+      this._sendSingleEmailCore(email, name, templateName, subject, scheduleTime, firstName, mode)
         .then((r) => done(resolve, r))
         .catch((err) => done(reject, err));
     });
   }
 
-  async _sendSingleEmailCore(email, name, templateName, subject, scheduleTime, firstName) {
+  async _sendSingleEmailCore(email, name, templateName, subject, scheduleTime, firstName, mode = 'today') {
     this._log(`开始发送邮件: ${email} | 模板: ${templateName}`);
+
+    // 日期模式：'today'（今日，若时间已过自动顺延明天）| 'nextday'（次日），默认今日（对齐复邀逻辑）
+    this.scheduleMode = (mode === 'nextday') ? 'nextday' : 'today';
 
     // 解析定时发送时间（格式: "HH:MM"），覆盖实例级默认值
     if (scheduleTime) {
@@ -654,13 +657,13 @@ class GmailAutomation extends EventEmitter {
       throw new Error('定时发送第 1 步失败：找不到回复框的 More send options 下拉箭头');
     }
     await this._logHitElement(dropArrow, '复邀-More send options 箭头');
-    this._log('[reinvite-schedule] ACTION: click More send options');
+    this._log('[gmail-schedule] ACTION: click More send options');
     await this._safeClick(dropArrow, 'More send options 箭头');
-    this._log('[reinvite-schedule] ACTION DONE: click More send options');
+    this._log('[gmail-schedule] ACTION DONE: click More send options');
     // 不再固定 sleep(800)：下一步精确选择器会 waitFor 菜单项出现，出现即继续
     await this._debugDumpMenuItems('复邀-点 More send options 后可见菜单项');
     await this._observeReinviteScheduleState('step1-after-more-options');
-    this._log(`[reinvite-schedule] 第1步总耗时 ${Date.now() - step1T0}ms（找箭头→click→诊断）`);
+    this._log(`[gmail-schedule] 第1步总耗时 ${Date.now() - step1T0}ms（找箭头→click→诊断）`);
 
     // ── 定时发送第 2 步：点 Schedule send（展开 schedule 菜单，含 "Pick date & time"）──
     this._log('定时发送第 2 步: 点 Schedule send...');
@@ -678,14 +681,14 @@ class GmailAutomation extends EventEmitter {
     ];
     let t2 = Date.now();
     let scheduleOption = await this._waitForAnyVisible(scheduleOptionSelectors, 1000);
-    this._log(`[reinvite-schedule] Schedule send selector 定位耗时 ${Date.now() - t2}ms`);
+    this._log(`[gmail-schedule] Schedule send selector 定位耗时 ${Date.now() - t2}ms`);
 
     // 2) 兜底：规范化空白后的文本 includes 匹配（扛住 tag 不一致 / 多余空格 / aria 缺失）
     if (!scheduleOption) {
-      this._log('[reinvite-schedule] selector 未命中，改用文本匹配（normalize includes）定位 Schedule send');
+      this._log('[gmail-schedule] selector 未命中，改用文本匹配（normalize includes）定位 Schedule send');
       t2 = Date.now();
       scheduleOption = await this._findMenuItemByText(['Schedule send', '安排发送', '定时发送'], 6000);
-      this._log(`[reinvite-schedule] Schedule send 文本兜底耗时 ${Date.now() - t2}ms`);
+      this._log(`[gmail-schedule] Schedule send 文本兜底耗时 ${Date.now() - t2}ms`);
     }
 
     if (!scheduleOption) {
@@ -694,12 +697,12 @@ class GmailAutomation extends EventEmitter {
       throw new Error('定时发送第 2 步失败：找不到 Schedule send 选项');
     }
     await this._logHitElement(scheduleOption, '复邀-Schedule send 选项');
-    this._log('[reinvite-schedule] ACTION: click Schedule send');
+    this._log('[gmail-schedule] ACTION: click Schedule send');
     await this._safeClick(scheduleOption, 'Schedule send 选项');
-    this._log('[reinvite-schedule] ACTION DONE: click Schedule send');
+    this._log('[gmail-schedule] ACTION DONE: click Schedule send');
     // 不再固定 sleep(1000)：下一步 _openPickDateTimeDialog 会 waitFor "Pick date & time" 出现即继续
     await this._observeReinviteScheduleState('step2-after-schedule-send');
-    this._log(`[reinvite-schedule] 第2步总耗时 ${Date.now() - step2T0}ms（定位Schedule→click→诊断）`);
+    this._log(`[gmail-schedule] 第2步总耗时 ${Date.now() - step2T0}ms（定位Schedule→click→诊断）`);
 
     // ── 定时发送第 3 步：点 "Pick date & time"，打开日期时间对话框 ──
     const dialog = await this._openPickDateTimeDialog();
@@ -707,11 +710,11 @@ class GmailAutomation extends EventEmitter {
     const step3Labelledby = await dialog.getAttribute('aria-labelledby').catch(() => '');
     const step3DateCount = await dialog.locator('input[aria-label="Date"]').filter({ visible: true }).count().catch(() => 0);
     const step3TimeCount = await dialog.locator('input[aria-label="Time"]').filter({ visible: true }).count().catch(() => 0);
-    this._log(`[reinvite-schedule] step3 面板已打开: aria-labelledby="${step3Labelledby}" Date输入框=${step3DateCount} Time输入框=${step3TimeCount}`);
+    this._log(`[gmail-schedule] step3 面板已打开: aria-labelledby="${step3Labelledby}" Date输入框=${step3DateCount} Time输入框=${step3TimeCount}`);
 
     // ── 定时发送第 4 步：计算目标日期时间（业务只给 HH:MM，日期取今天/明天）──
     const target = this._computeScheduleTarget();
-    this._log(`[reinvite-schedule] 目标: ${target.year}-${target.month + 1}-${target.day} ${target.hour12}:${String(target.minute).padStart(2, '0')} ${target.ampm}`);
+    this._log(`[gmail-schedule] 目标: ${target.year}-${target.month + 1}-${target.day} ${target.hour12}:${String(target.minute).padStart(2, '0')} ${target.ampm}`);
 
     // ── 定时发送第 5 步：填 Date + 校验 ──
     const dateRes = await this._setScheduleDate(dialog, target);
@@ -733,7 +736,7 @@ class GmailAutomation extends EventEmitter {
       await this._saveReinviteScheduleDebugShot('B-precheck-confirm-missing-FAIL');
       throw new Error('定时发送 B 前置检查失败：找不到确认按钮 button[data-mdc-dialog-action="ok"]');
     }
-    this._log('[reinvite-schedule] B 前置检查通过：Time 非空、确认按钮存在');
+    this._log('[gmail-schedule] B 前置检查通过：Time 非空、确认按钮存在');
     await this._logHitElement(confirmBtn, '复邀-确认按钮 Schedule send');
     await this._saveReinviteScheduleDebugShot('schedule-before-confirm');
 
@@ -761,9 +764,9 @@ class GmailAutomation extends EventEmitter {
     this.page.on('response', netListener);
     this._log('📡 已开始监听 mail.google.com 写请求（只关注 发送/定时 与 >=400 错误，过滤重定向/图片/埋点）');
 
-    this._log('[reinvite-schedule] ACTION: click 确认按钮 button[data-mdc-dialog-action="ok"]');
+    this._log('[gmail-schedule] ACTION: click 确认按钮 button[data-mdc-dialog-action="ok"]');
     await this._safeClick(confirmBtn, '确认按钮 Schedule send');
-    this._log('[reinvite-schedule] ACTION DONE: click 确认按钮');
+    this._log('[gmail-schedule] ACTION DONE: click 确认按钮');
     await this._observeReinviteScheduleState('step8-after-confirm');
 
     // ── 第 9 步：等待 Gmail 完成定时发送（可靠信号为主，前 15s 高频抓信号）──
@@ -855,13 +858,13 @@ class GmailAutomation extends EventEmitter {
 
   // 打开 Pick date & time 对话框：在 Schedule send 菜单里点 "Pick date & time"，等待含 Date input 的对话框出现
   async _openPickDateTimeDialog() {
-    this._log('[reinvite-schedule] Opening Pick date & time');
+    this._log('[gmail-schedule] Opening Pick date & time');
     const step3T0 = Date.now();
     // 第 2 步已点 Schedule send，step2 面板（div[role="dialog"][aria-label="Schedule send"]）应已出现。
     // 用文本立即匹配 "Pick date & time"（div[role="menuitem"]），出现即点，不再固定 sleep。
     let t = Date.now();
     const pickDate = await this._findMenuItemByText(['Pick date & time', '选择日期'], 3000);
-    this._log(`[reinvite-schedule] 定位 Pick date & time 耗时 ${Date.now() - t}ms`);
+    this._log(`[gmail-schedule] 定位 Pick date & time 耗时 ${Date.now() - t}ms`);
     if (!pickDate) {
       await this._debugDumpMenuItems('复邀 - 查找 Pick date & time 失败');
       await this._dumpMenuItemsFull('复邀 - 查找 Pick date & time 失败完整 dump');
@@ -869,9 +872,9 @@ class GmailAutomation extends EventEmitter {
       throw new Error('定时发送 A 失败：找不到 Pick date & time 菜单项');
     }
     await this._logHitElement(pickDate, '复邀-Pick date & time 菜单项');
-    this._log('[reinvite-schedule] ACTION: click Pick date & time');
+    this._log('[gmail-schedule] ACTION: click Pick date & time');
     await this._safeClick(pickDate, 'Pick date & time 菜单项');
-    this._log('[reinvite-schedule] ACTION DONE: click Pick date & time');
+    this._log('[gmail-schedule] ACTION DONE: click Pick date & time');
 
     // 等 step3 对话框（含 Date 输入框）出现，出现即继续（不再 sleep）
     const dialogLoc = this.page.locator('div[role="dialog"]')
@@ -885,8 +888,8 @@ class GmailAutomation extends EventEmitter {
       await this._saveReinviteScheduleDebugShot('pickdate-dialog-FAIL');
       throw new Error('定时发送 A 失败：点 Pick date & time 后未出现日期时间对话框');
     }
-    this._log(`[reinvite-schedule] step3 对话框出现，耗时 ${Date.now() - t}ms`);
-    this._log(`[reinvite-schedule] 第3步总耗时 ${Date.now() - step3T0}ms（定位Pick date & time→click→等step3对话框）`);
+    this._log(`[gmail-schedule] step3 对话框出现，耗时 ${Date.now() - t}ms`);
+    this._log(`[gmail-schedule] 第3步总耗时 ${Date.now() - step3T0}ms（定位Pick date & time→click→等step3对话框）`);
     return dialogLoc;
   }
 
@@ -894,47 +897,47 @@ class GmailAutomation extends EventEmitter {
   async _setScheduleDate(dialog, target) {
     const dateInput = dialog.locator('input[aria-label="Date"]').first();
     const current = (await dateInput.inputValue().catch(() => '')) || '';
-    this._log('[reinvite-schedule] Date input found');
-    this._log(`[reinvite-schedule] Current Date: ${current}`);
+    this._log('[gmail-schedule] Date input found');
+    this._log(`[gmail-schedule] Current Date: ${current}`);
 
     const targetMon = this._shortMonth(target.month);
-    this._log(`[reinvite-schedule] Target Date: ${target.year}-${target.month + 1}-${target.day} (${targetMon})`);
+    this._log(`[gmail-schedule] Target Date: ${target.year}-${target.month + 1}-${target.day} (${targetMon})`);
 
     // 1) 当前日期已是目标日期 → 不重复点击
     const cur = this._extractDayMonth(current);
     if (cur && cur.day === target.day && cur.month === target.month) {
-      this._log('[reinvite-schedule] Date already matches target, skip');
+      this._log('[gmail-schedule] Date already matches target, skip');
       return { ok: true, value: current, skipped: true };
     }
 
     // 2) 优先 input 填充（格式沿用当前值）
     const targetStr = this._formatDateLike(current, target);
-    this._log('[reinvite-schedule] ACTION: click Date input');
+    this._log('[gmail-schedule] ACTION: click Date input');
     await this._safeClick(dateInput, 'Date 输入框');
-    this._log(`[reinvite-schedule] ACTION: fill Date input = "${targetStr}"`);
+    this._log(`[gmail-schedule] ACTION: fill Date input = "${targetStr}"`);
     await dateInput.fill(targetStr);
-    this._log('[reinvite-schedule] ACTION DONE: fill Date input');
+    this._log('[gmail-schedule] ACTION DONE: fill Date input');
     // ★ 绝不用 press('Enter')：在 Gmail 的 Pick date & time 对话框内按 Enter 会触发对话框默认动作
     //   （即 button[data-mdc-dialog-action="ok"] 的 Schedule send），直接提交发送并卡在 "Still sending..."。
     //   改成 blur + 派发 input/change 事件，让 Gmail 受控组件读取新值即可，不触发提交。
-    this._log('[reinvite-schedule] ACTION: blur Date input (dispatch input/change, 不按 Enter)');
+    this._log('[gmail-schedule] ACTION: blur Date input (dispatch input/change, 不按 Enter)');
     await dateInput.evaluate((el) => {
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     });
     await dateInput.blur().catch(() => {});
-    this._log('[reinvite-schedule] ACTION DONE: blur Date input');
+    this._log('[gmail-schedule] ACTION DONE: blur Date input');
     await this._sleep(500);
     const afterInput = (await dateInput.inputValue().catch(() => '')) || '';
-    this._log(`[reinvite-schedule] Date input updated: ${afterInput}`);
+    this._log(`[gmail-schedule] Date input updated: ${afterInput}`);
     const aftIn = this._extractDayMonth(afterInput);
     if (aftIn && aftIn.day === target.day && aftIn.month === target.month) {
-      this._log('[reinvite-schedule] Date verification: PASS');
+      this._log('[gmail-schedule] Date verification: PASS');
       return { ok: true, value: afterInput };
     }
 
     // 3) input 未生效 → 日历 gridcell 兜底
-    this._log('[reinvite-schedule] Date input did not take effect, fallback to calendar gridcell');
+    this._log('[gmail-schedule] Date input did not take effect, fallback to calendar gridcell');
     const cellLabel = `${target.day} ${targetMon}`;
     const cell = dialog.locator(`td[role="gridcell"][aria-label="${cellLabel}"]`).filter({ visible: true }).last();
     try {
@@ -946,14 +949,14 @@ class GmailAutomation extends EventEmitter {
       throw new Error(`定时发送 A 失败：日历中找不到日期 gridcell [aria-label="${cellLabel}"]`);
     }
     const afterCell = (await dateInput.inputValue().catch(() => '')) || '';
-    this._log(`[reinvite-schedule] Date after gridcell click: ${afterCell}`);
+    this._log(`[gmail-schedule] Date after gridcell click: ${afterCell}`);
     const aftCell = this._extractDayMonth(afterCell);
     if (!aftCell || aftCell.day !== target.day || aftCell.month !== target.month) {
       await this._saveReinviteScheduleDebugShot('date-verify-FAIL');
-      this._log(`[reinvite-schedule] ❌ Date verification failed (current=${afterCell}, target=${cellLabel})`);
+      this._log(`[gmail-schedule] ❌ Date verification failed (current=${afterCell}, target=${cellLabel})`);
       throw new Error(`定时发送 A 失败：Date verification failed (current=${afterCell}, target=${cellLabel})`);
     }
-    this._log('[reinvite-schedule] Date verification: PASS (via gridcell)');
+    this._log('[gmail-schedule] Date verification: PASS (via gridcell)');
     return { ok: true, value: afterCell };
   }
 
@@ -961,37 +964,37 @@ class GmailAutomation extends EventEmitter {
   async _setScheduleTime(dialog, target) {
     const timeInput = dialog.locator('input[aria-label="Time"]').first();
     const current = (await timeInput.inputValue().catch(() => '')) || '';
-    this._log('[reinvite-schedule] Time input found');
-    this._log(`[reinvite-schedule] Current Time: ${current}`);
+    this._log('[gmail-schedule] Time input found');
+    this._log(`[gmail-schedule] Current Time: ${current}`);
 
     const timeStr = `${target.hour12}:${String(target.minute).padStart(2, '0')} ${target.ampm}`;
-    this._log(`[reinvite-schedule] Target Time: ${timeStr}`);
+    this._log(`[gmail-schedule] Target Time: ${timeStr}`);
 
-    this._log('[reinvite-schedule] ACTION: click Time input');
+    this._log('[gmail-schedule] ACTION: click Time input');
     await this._safeClick(timeInput, 'Time 输入框');
-    this._log(`[reinvite-schedule] ACTION: fill Time input = "${timeStr}"`);
+    this._log(`[gmail-schedule] ACTION: fill Time input = "${timeStr}"`);
     await timeInput.fill(timeStr);
-    this._log('[reinvite-schedule] ACTION DONE: fill Time input');
+    this._log('[gmail-schedule] ACTION DONE: fill Time input');
     // ★ 绝不用 press('Enter')（原因同 Date：会触发对话框默认动作 → 直接提交并卡在 "Still sending..."）
-    this._log('[reinvite-schedule] ACTION: blur Time input (dispatch input/change, 不按 Enter)');
+    this._log('[gmail-schedule] ACTION: blur Time input (dispatch input/change, 不按 Enter)');
     await timeInput.evaluate((el) => {
       el.dispatchEvent(new Event('input', { bubbles: true }));
       el.dispatchEvent(new Event('change', { bubbles: true }));
     });
     await timeInput.blur().catch(() => {});
-    this._log('[reinvite-schedule] ACTION DONE: blur Time input');
+    this._log('[gmail-schedule] ACTION DONE: blur Time input');
     await this._sleep(500);
     const after = (await timeInput.inputValue().catch(() => '')) || '';
-    this._log(`[reinvite-schedule] Time input updated: ${after}`);
+    this._log(`[gmail-schedule] Time input updated: ${after}`);
 
     const parsed = this._parseClock24h(after);
     const ok = parsed && parsed.hour24 === this.scheduleHour && parsed.minute === this.scheduleMinute;
     if (!ok) {
       await this._saveReinviteScheduleDebugShot('time-verify-FAIL');
-      this._log(`[reinvite-schedule] ❌ Time input did not take effect (current=${after}, target=${timeStr})`);
+      this._log(`[gmail-schedule] ❌ Time input did not take effect (current=${after}, target=${timeStr})`);
       throw new Error(`定时发送 A 失败：Time verification failed (current=${after}, target=${timeStr})`);
     }
-    this._log('[reinvite-schedule] Time verification: PASS');
+    this._log('[gmail-schedule] Time verification: PASS');
     return { ok: true, value: after };
   }
 
@@ -1466,78 +1469,14 @@ async _scheduleSend() {
 
     await this._sleep(800);
     
-    // ===== 选择 "Pick date & time" =====
-    this._log('查找 "Pick date & time" 选项...');
-    
-    const pickDateSelectors = [
-        'text="Pick date & time"',
-        'text="选择日期和时间"',
-        'div[role="menuitem"]:has-text("Pick date")'
-    ];
-    
-    let pickDateFound = false;
-    for (const selector of pickDateSelectors) {
-        try {
-            const pickDate = await this.page.$(selector);
-            if (pickDate && await pickDate.isVisible()) {
-                await pickDate.click();
-                this._log('已选择自定义日期时间');
-                pickDateFound = true;
-                break;
-            }
-        } catch (err) {}
-    }
-    
-    if (!pickDateFound) {
-        this._log('未找到自定义日期时间选项，继续执行');
-    }
-    
-    await this._sleep(800);
-
-    // ===== 设置时间 =====
-    const hour12 = this.scheduleHour > 12 ? this.scheduleHour - 12 : (this.scheduleHour === 0 ? 12 : this.scheduleHour);
-    const ampm = this.scheduleHour >= 12 ? 'PM' : 'AM';
-    const minute = String(this.scheduleMinute || 0).padStart(2, '0');
-    const timeStr = `${hour12}:${minute} ${ampm}`;
-    this._log(`正在设置定时时间: ${timeStr}`);
-
-    // 通过 aria-label="Time" 查找时间输入框
-    const timeInput = await this.page.$('input[aria-label="Time"]');
-
-    if (timeInput && await timeInput.isVisible()) {
-        await timeInput.click();
-        await timeInput.fill('');
-        await timeInput.fill(timeStr);
-        this._log(`已通过 Time 输入框设置时间: ${timeStr}`);
-    } else {
-        // 备选：通过 class 查找
-        const fallbackInput = await this.page.$('.qdOxv-K0-wGMbrd');
-        if (fallbackInput && await fallbackInput.isVisible()) {
-            await fallbackInput.click();
-            await fallbackInput.fill('');
-            await fallbackInput.fill(timeStr);
-            this._log(`通过 class 设置时间: ${timeStr}`);
-        } else {
-            // 最后手段：使用 JavaScript 直接设置
-            await this.page.evaluate((t) => {
-                const input = document.querySelector('input[aria-label="Time"]');
-                if (input) {
-                    input.value = t;
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                    input.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            }, timeStr);
-            this._log(`通过 JS 设置时间: ${timeStr}`);
-        }
-    }
-    
-    // 按 Enter 确认时间
-    await this.page.keyboard.press('Enter');
-    await this._sleep(500);
-    
-    this._log(`定时时间设置完成: ${timeStr}`);
-    await this._sleep(1000);
-    
+    // ===== 打开 Pick date & time 对话框，并填日期 + 时间 =====
+    // 对齐复邀逻辑：复用 _openPickDateTimeDialog / _computeScheduleTarget /
+    // _setScheduleDate / _setScheduleTime，按 scheduleMode 计算日期（今日过点顺延明天），
+    // 同时填 Date 与 Time（旧逻辑只填时间、不填日期）。
+    const dialog = await this._openPickDateTimeDialog();
+    const target = this._computeScheduleTarget();
+    await this._setScheduleDate(dialog, target);
+    await this._setScheduleTime(dialog, target);
     // ===== 点击确认发送按钮（Schedule send）=====
     this._log('查找确认发送按钮...');
 
@@ -1918,7 +1857,7 @@ async _handleConfirmationDialog() {
         .first();
       await anyVisible.waitFor({ state: 'visible', timeout });
     } catch {
-      this._log(`[reinvite-schedule] _waitForAnyVisible 未命中 耗时 ${Date.now() - t0}ms (timeout=${timeout}ms): ${shortSel}${selectors.length > 4 ? ' ...' : ''}`);
+      this._log(`[gmail-schedule] _waitForAnyVisible 未命中 耗时 ${Date.now() - t0}ms (timeout=${timeout}ms): ${shortSel}${selectors.length > 4 ? ' ...' : ''}`);
       return null; // 等满 timeout 仍无可见元素
     }
 
@@ -1928,7 +1867,7 @@ async _handleConfirmationDialog() {
       const loc = this.page.locator(sel).filter({ visible: true }).last();
       if (await loc.count() > 0) {
         const elapsed = Date.now() - t0;
-        this._log(`[reinvite-schedule] _waitForAnyVisible 命中 耗时 ${elapsed}ms: ${sel}`);
+        this._log(`[gmail-schedule] _waitForAnyVisible 命中 耗时 ${elapsed}ms: ${sel}`);
         if (elapsed > 2000) await this._logElState(loc, `等待>2s (${sel})`);
         return loc;
       }
@@ -1951,7 +1890,7 @@ async _handleConfirmationDialog() {
           aria: el.getAttribute ? (el.getAttribute('aria-label') || '') : '',
         };
       }).catch(() => null);
-      this._log(`[reinvite-schedule]   元素状态[${label}]: ${JSON.stringify(info)}`);
+      this._log(`[gmail-schedule]   元素状态[${label}]: ${JSON.stringify(info)}`);
     } catch (e) { /* 诊断失败不影响主流程 */ }
   }
 
@@ -1963,17 +1902,17 @@ async _handleConfirmationDialog() {
   async _safeClick(target, label, { timeout = 5000 } = {}) {
     const isHandle = typeof target.asElement === 'function';
     const t0 = Date.now();
-    this._log(`[reinvite-schedule] CLICK 开始: ${label} (timeout=${timeout}ms)`);
+    this._log(`[gmail-schedule] CLICK 开始: ${label} (timeout=${timeout}ms)`);
     // 1) 正常路径：Playwright click（含可见/稳定/可点检查，短超时）
     try {
       await target.click({ timeout });
       const elapsed = Date.now() - t0;
-      this._log(`[reinvite-schedule] CLICK 完成: ${label} 耗时 ${elapsed}ms`);
+      this._log(`[gmail-schedule] CLICK 完成: ${label} 耗时 ${elapsed}ms`);
       if (elapsed > 2000) await this._logElState(target, `${label} (click 耗时>2s)`);
       return;
     } catch (err) {
       const elapsed = Date.now() - t0;
-      this._log(`[reinvite-schedule] CLICK 超时(${elapsed}ms)，转 DOM 兜底: ${label} — ${String(err.message).split('\n')[0]}`);
+      this._log(`[gmail-schedule] CLICK 超时(${elapsed}ms)，转 DOM 兜底: ${label} — ${String(err.message).split('\n')[0]}`);
       await this._logElState(target, `${label} (click 超时)`);
     }
     // 2) 兜底：DOM click 直接派发事件（绕过 stability / 可点检查）
@@ -1985,9 +1924,9 @@ async _handleConfirmationDialog() {
         if (!handle) throw new Error('elementHandle 拿不到元素');
         await handle.evaluate((el) => el.click());
       }
-      this._log(`[reinvite-schedule] CLICK 兜底(DOM)完成: ${label} 总耗时 ${Date.now() - t0}ms`);
+      this._log(`[gmail-schedule] CLICK 兜底(DOM)完成: ${label} 总耗时 ${Date.now() - t0}ms`);
     } catch (e2) {
-      this._log(`[reinvite-schedule] ❌ CLICK 兜底(DOM)也失败: ${label} — ${String(e2.message).split('\n')[0]}`);
+      this._log(`[gmail-schedule] ❌ CLICK 兜底(DOM)也失败: ${label} — ${String(e2.message).split('\n')[0]}`);
       throw new Error(`定时发送点击失败: ${label} (${String(e2.message).split('\n')[0]})`);
     }
   }
@@ -2067,8 +2006,8 @@ async _handleConfirmationDialog() {
           html: (node.outerHTML || '').replace(/\s+/g, ' ').slice(0, 300),
         })).catch(() => null);
         if (info) {
-          this._log(`[reinvite-schedule] 文本匹配命中: <${info.tag} role="menuitem" class="${info.cls}" aria="${info.aria}"> text="${info.text}"`);
-          this._log(`[reinvite-schedule] 命中 outerHTML: ${info.html}`);
+          this._log(`[gmail-schedule] 文本匹配命中: <${info.tag} role="menuitem" class="${info.cls}" aria="${info.aria}"> text="${info.text}"`);
+          this._log(`[gmail-schedule] 命中 outerHTML: ${info.html}`);
         }
         return el;
       }
@@ -2187,15 +2126,15 @@ async _handleConfirmationDialog() {
       //   加 timeout 压到 1s，读不到就返回空，不再拖慢诊断。
       const dateValue = (await this.page.locator('input[aria-label="Date"]').first().inputValue({ timeout: 1000 }).catch(() => '')) || '';
       const timeValue = (await this.page.locator('input[aria-label="Time"]').first().inputValue({ timeout: 1000 }).catch(() => '')) || '';
-      this._log(`[reinvite-schedule] Gmail 状态 [${label}]:`);
-      this._log(`[reinvite-schedule]   sending=${state.sending} sent=${state.sent} failed=${state.failed}`);
-      this._log(`[reinvite-schedule]   可见dialog=${dialogCount} step2面板=${step2Count} step3(Date输入框)=${step3Date} step3(Time输入框)=${step3Time} 确认按钮=${confirmCount} 回复框=${replyCount}`);
-      this._log(`[reinvite-schedule]   Date读回=[${dateValue}] Time读回=[${timeValue}]`);
-      this._log(`[reinvite-schedule]   toast=[${state.toastText || '无'}]`);
-      this._log(`[reinvite-schedule]   页面片段=[${(state.bodySnippet || '').slice(0, 200)}]`);
-      this._log(`[reinvite-schedule] Gmail 状态 [${label}] 读取耗时 ${Date.now() - t0}ms`);
+      this._log(`[gmail-schedule] Gmail 状态 [${label}]:`);
+      this._log(`[gmail-schedule]   sending=${state.sending} sent=${state.sent} failed=${state.failed}`);
+      this._log(`[gmail-schedule]   可见dialog=${dialogCount} step2面板=${step2Count} step3(Date输入框)=${step3Date} step3(Time输入框)=${step3Time} 确认按钮=${confirmCount} 回复框=${replyCount}`);
+      this._log(`[gmail-schedule]   Date读回=[${dateValue}] Time读回=[${timeValue}]`);
+      this._log(`[gmail-schedule]   toast=[${state.toastText || '无'}]`);
+      this._log(`[gmail-schedule]   页面片段=[${(state.bodySnippet || '').slice(0, 200)}]`);
+      this._log(`[gmail-schedule] Gmail 状态 [${label}] 读取耗时 ${Date.now() - t0}ms`);
     } catch (e) {
-      this._log(`[reinvite-schedule] Gmail 状态 [${label}] 读取失败: ${e.message}（耗时 ${Date.now() - t0}ms）`);
+      this._log(`[gmail-schedule] Gmail 状态 [${label}] 读取失败: ${e.message}（耗时 ${Date.now() - t0}ms）`);
     }
   }
 

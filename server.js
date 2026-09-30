@@ -416,7 +416,7 @@ function createServer() {
     parseBody(req).then(async (body) => {
       console.log('[send-emails] === 收到请求 ===');
 
-      const { recipients, scheduleTime } = body;
+      const { recipients, scheduleTime, mode } = body;
 
       // ── 品牌 → Gmail 模板映射 ─────────────────────
       const BRAND_TEMPLATES = {};
@@ -454,7 +454,9 @@ function createServer() {
       console.log('[send-emails] profile:', fs.existsSync(profilePath) ? '存在' : '不存在');
 
       const finalScheduleTime = scheduleTime || DEFAULT_SCHEDULE_TIME;
-      console.log(`[send-emails] ${processedRecipients.length} 封, 定时: ${finalScheduleTime}`);
+      // 日期模式：'today'（今日，过点顺延明天）| 'nextday'（次日），默认今日 —— 对齐复邀逻辑
+      const finalMode = (mode === 'nextday') ? 'nextday' : 'today';
+      console.log(`[send-emails] ${processedRecipients.length} 封, 定时: ${finalScheduleTime} (${finalMode})`);
 
       // ── 发送循环 ──────────────────────────────────
       const automation = new GmailAutomation({ headless: false });
@@ -478,7 +480,7 @@ function createServer() {
           console.log(`[send-emails] [${i + 1}/${processedRecipients.length}] ${r.email} | ${r.brand} | 最终标题="${subject}"`);
 
           try {
-            await automation.sendSingleEmail(r.email, r.name, templateName, subject, finalScheduleTime, r.firstName);
+            await automation.sendSingleEmail(r.email, r.name, templateName, subject, finalScheduleTime, r.firstName, finalMode);
             successCount++;
             console.log(`[send-emails] ✅ ${r.email} 已定时`);
           } catch (err) {
