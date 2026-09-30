@@ -8,7 +8,7 @@ echo ============================================
 echo.
 
 REM ---- Step 1: Check Node.js ----
-echo [1/3] Checking Node.js...
+echo [1/4] Checking Node.js...
 node --version >nul 2>&1
 if errorlevel 1 (
   echo.
@@ -29,7 +29,7 @@ for /f "delims=" %%v in ('node --version') do echo   Node.js version: %%v
 echo.
 
 REM ---- Step 2: Install npm dependencies ----
-echo [2/3] Installing dependencies...
+echo [2/4] Installing dependencies...
 if exist "node_modules\" (
   echo   node_modules already exists, skipping.
 ) else (
@@ -45,7 +45,7 @@ if exist "node_modules\" (
 echo.
 
 REM ---- Step 3: Install Playwright browser ----
-echo [3/3] Installing Playwright browser (chromium)...
+echo [3/4] Installing Playwright browser (chromium)...
 echo   Using China mirror for faster download.
 echo   This may take a few minutes (about 180 MB).
 echo.
@@ -61,6 +61,16 @@ if errorlevel 1 (
 echo.
 
 echo ============================================
+REM ---- Step 4: Create desktop shortcut ----
+echo [4/4] Creating desktop shortcut...
+powershell -NoProfile -Command "$WS = New-Object -ComObject WScript.Shell; $SC = $WS.CreateShortcut([Environment]::GetFolderPath('Desktop') + '\Influencer CRM.lnk'); $SC.TargetPath = '%~dp0start.bat'; $SC.WorkingDirectory = '%~dp0'; $SC.Description = 'Launch Influencer CRM'; $SC.Save()" >nul 2>&1
+if errorlevel 1 (
+  echo   [WARNING] Failed to create shortcut. You can still use start.bat.
+) else (
+  echo   Shortcut created on Desktop: "Influencer CRM"
+)
+echo.
+
 echo   Setup complete!
 echo ============================================
 echo.
