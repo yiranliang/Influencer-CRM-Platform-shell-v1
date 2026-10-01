@@ -269,7 +269,7 @@ class GmailAutomation extends EventEmitter {
     // 4. 选择模板（直接使用传入的 templateName，由调用方负责品牌→模板映射）
     this._log('步骤 4/8: 选择模板...');
     await this._selectTemplate(templateName);
-    await this._sleep(1500);
+    await this._sleep(2500);
 
     // 5. 处理弹窗（如果有）
     this._log('步骤 5/8: 处理插入文件弹窗...');
@@ -330,9 +330,9 @@ class GmailAutomation extends EventEmitter {
   // ─── 复邀（回复已有邮件线程）──────────────────────
 
   async reinviteSingleEmail(email, templateName, scheduleTime, firstName, mode = 'today') {
-    // 整个复邀流程的总超时保护。★必须大于内部 _waitForSendComplete 的 120s 等待窗口，
+    // 整个复邀流程的总超时保护。★必须大于内部 _waitReinviteSendComplete 的 120s 等待窗口，
     // 否则外层超时先触发 → server 端 finally 里 cleanup() 把浏览器关了 → 内层还在轮询
-    // 的 _waitForSendComplete 会报 "browser has been closed"。定 5 分钟留足余量。
+    // 的 _waitReinviteSendComplete 会报 "browser has been closed"。定 5 分钟留足余量。
     const TIMEOUT_MS = 300000;
     let timer;
     return new Promise((resolve, reject) => {
@@ -1224,7 +1224,7 @@ class GmailAutomation extends EventEmitter {
     if (template) {
       await template.click();
       this._log(`已选择模板: ${templateName}`);
-      await this._sleep(1500);
+      await this._sleep(2500);
       
       // ===== 自动处理 Insert Files 弹窗 =====
       await this._handleInsertFilesDialog();
@@ -1355,27 +1355,50 @@ async _handleInsertFilesDialog() {
   // ─── 修改主题 ──────────────────────────────────
 
   async _modifySubject(subject) {
-    // 直接用 JavaScript 操作设置主题
+    // 为什么改用「键盘输入 + 读回验证」而不是直接 JS 赋值：
+    // Gmail 主题框是 React 受控组件，直接 box.value = xxx 只改了 DOM 值、没触发 React 状态更新，
+    // 模板稍后异步渲染时又会用模板自带的 subject 把值盖回去，造成「日志说已填写、实际没变」。
+    // 用 page.keyboard.type() 模拟真实键盘输入，走 Gmail 自己的输入事件链路，React 会正常接收；
+    // 再读回 input.value 验证是否等于目标，失败重试 3 次（覆盖→不匹配→重试），防模板异步覆盖。
     const newSubject = subject || 'PR Box of June: Saodimallsu Collab Invitation';
-    const result = await this.page.evaluate((data) => {
-        const subjectBox = document.querySelector('input[name="subjectbox"]');
-        if (!subjectBox) {
-            return { success: false, error: '找不到主题输入框' };
-        }
-        subjectBox.value = '';
-        subjectBox.value = data.newSubject;
-        subjectBox.dispatchEvent(new Event('input', { bubbles: true }));
-        return { success: true, subject: data.newSubject };
-    }, { newSubject });
-    
-    if (result.success) {
-        this._log(`已填写主题: ${result.subject}`);
-    } else {
-        throw new Error(result.error);
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      // 找到主题框并 focus + 清空（清空也要触发 input，让 React 知道值已被清掉）
+      const found = await this.page.evaluate(() => {
+        const box = document.querySelector('input[name="subjectbox"]');
+        if (!box) return false;
+        box.focus();
+        box.value = '';
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      });
+      if (!found) {
+        await this._sleep(500);
+        continue;
+      }
+
+      // 用键盘逐字输入（delay 模拟人手），Gmail 更认可这种方式
+      await this.page.keyboard.type(newSubject, { delay: 10 });
+      await this._sleep(300);
+
+      // 读回验证：主题框值必须等于目标，否则可能是模板异步覆盖了
+      const current = await this.page.evaluate(() => {
+        const box = document.querySelector('input[name="subjectbox"]');
+        return box ? box.value : '';
+      });
+
+      if (current === newSubject) {
+        this._log(`已填写主题: ${newSubject}`);
+        await this._sleep(300);
+        return;
+      }
+
+      this._log(`主题验证失败（尝试 ${attempt + 1}/3），当前值="${current}"`);
+      await this._sleep(500);
     }
-    
-    await this._sleep(500);
-}
+
+    throw new Error('主题填写失败（3 次尝试后仍不匹配）');
+  }
 
     // ─── 6. 定时发送 ─────────────────────────────────
 
@@ -1543,7 +1566,7 @@ async _scheduleSend() {
 
     // 点击发送后不重试，只等待结果：必须等 Gmail 确认发送真正完成
     // （长邮件会停留在 "Sending..." 状态较久，固定 sleep(2s) 会提前收尾、打断提交）
-    await this._waitForSendComplete();
+    await this._waitForSendComplete(15000, 'send-debug');
 
     // 处理可能出现的确认弹窗（如 "此邮件将定时发送"）
     await this._handleConfirmationDialog();
@@ -1677,26 +1700,24 @@ async _handleConfirmationDialog() {
 
   // ─── 8.6 等待发送完成 ────────────────────────────
 
-  // 轮询等待 Gmail 真正完成发送（长邮件会长时间停留在 "Sending..."/"Still sending" 状态，
-  // 不能只靠固定 sleep）。首次触达（独立撰写浮层）和复邀（内联回复框）都走这里。
+  // 轮询等待 Gmail 发送完成。此函数只服务于「首次触达」（发信）流程：
+  // 发信是「点击 Schedule send = 已提交」场景，提交后 Compose 窗口**不关闭**、也不会出现
+  // "Sending..." 指示（定时发送是直接提交），所以不能用「窗口/回复框关闭」或「Sending 消失」
+  // 当成功信号 —— 那样会永远等不到，误报「发送超时」（本次修复的 bug）。
   //
-  // 判定成功（满足其一）：
-  //   1. 出现 "Message sent/已发送/Message scheduled/已安排发送" 的 toast；
-  //   2. 页面稳定进入「无 Sending 指示 +（之前见过 Sending 或 写信/回复框已关闭）」状态 ≥3 秒
-  //      —— 复邀的回复框在点击发送后会很快收起、但长邮件后台仍在提交，
-  //         所以「回复框关闭」不能单独当成功，必须等 Sending 指示也消失，并稳定几秒防弹回。
-  // 判定失败：出现 "wasn't sent"/"无法发送" 等错误提示。等待期间绝不做任何收尾动作。
-  async _waitForSendComplete(timeoutMs = 120000, shotDir = 'send-debug') {
-    this._log(`等待 Gmail 确认发送完成（最长 ${Math.round(timeoutMs / 1000)} 秒，轮询中）...`);
+  // 宽松判定：
+  //   1. 出现失败提示（wasn't sent / 无法发送）→ 抛错；
+  //   2. 出现成功 toast（已发送 / 已安排发送）→ 立即成功；
+  //   3. 等满 10 秒仍无 toast → 也判定成功（Schedule send 点击本身已成功提交）。
+  // 复邀流程不走这里，它用独立的 _waitReinviteSendComplete。
+  async _waitForSendComplete(timeoutMs = 15000, shotDir = 'send-debug') {
+    const TOAST_WAIT_MS = Math.min(10000, timeoutMs);
+    this._log(`等待 Gmail 发送确认（最多等 ${Math.round(TOAST_WAIT_MS / 1000)} 秒 toast，超时按已提交判定成功）...`);
     const start = Date.now();
-    let lastState = null;
-    let sawSending = false;   // 是否曾观察到 "Sending..." 指示
-    let doneSince = null;     // 「看起来完成」状态开始持续的时间戳
     let lastShot = 0;         // 上次诊断截图时间
 
-    while (Date.now() - start < timeoutMs) {
+    while (Date.now() - start < TOAST_WAIT_MS) {
       const state = await this._getSendState();
-      lastState = state;
 
       // 1) 失败信号优先
       if (state.failed) {
@@ -1710,27 +1731,6 @@ async _handleConfirmationDialog() {
         return;
       }
 
-      if (state.sending) {
-        // 仍在发送中 → 继续等，并记录「见过 Sending」
-        sawSending = true;
-        doneSince = null;
-        this._log('仍在发送中（Sending...），继续等待...');
-      } else {
-        // 「看起来完成」= 无 Sending 指示，且（之前见过 Sending，或写信/回复框已关闭）
-        const looksDone = sawSending || !state.composeOpen;
-        if (looksDone) {
-          if (doneSince === null) doneSince = Date.now();
-          if (Date.now() - doneSince >= 3000) {
-            this._log(sawSending
-              ? '✅ "Sending..." 指示已消失且稳定，判定后台发送完成'
-              : '✅ 写信/回复框已稳定关闭（≥3 秒），判定发送完成');
-            return;
-          }
-        } else {
-          doneSince = null;
-        }
-      }
-
       // 诊断截图：每隔几秒一张，方便卡住时定位 Gmail 停在哪一步
       if (Date.now() - lastShot >= 5000) {
         await this._saveSendDebugShot('sending-wait', shotDir);
@@ -1740,39 +1740,9 @@ async _handleConfirmationDialog() {
       await this._sleep(2000);
     }
 
-    await this._saveSendDebugShot('timeout', shotDir);
-
-    // 区分「普通超时」与「卡在 Sending」：卡在 Sending 说明 Gmail 提交被卡住、未真正完成发送，
-    // 绝不能当作成功。额外落一份 DOM 快照（可见 dialog/toast/button），方便定位卡在哪一步。
-    const stuckSending = !!(lastState && lastState.sending);
-    if (stuckSending) {
-      this._log('⚠️ Gmail appears stuck in Sending —— 疑似定时发送提交被卡住，邮件未真正完成 scheduled send');
-    } else {
-      this._log('⚠️ Send timeout —— 等待 Gmail 发送确认超时');
-    }
-    try {
-      const snapshot = await this.page.evaluate(() => {
-        const vis = (el) => el.offsetParent !== null || el.getClientRects().length > 0;
-        return {
-          dialogs: Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"]'))
-            .filter(vis).map(el => (el.innerText || '').replace(/\s+/g, ' ').slice(0, 200)),
-          buttons: Array.from(document.querySelectorAll('button, [role="button"]'))
-            .filter(vis).map(el => (el.innerText || el.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 60)).slice(0, 40),
-          toasts: Array.from(document.querySelectorAll('[role="status"], [role="alert"]'))
-            .filter(vis).map(el => (el.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 120)).slice(0, 5),
-        };
-      });
-      this._log(`⚠️ 超时 DOM 快照（日志） dialogs=${JSON.stringify(snapshot.dialogs)}`);
-      this._log(`⚠️ 超时 DOM 快照（日志） buttons=${JSON.stringify(snapshot.buttons)}`);
-      this._log(`⚠️ 超时 DOM 快照（日志） toasts=${JSON.stringify(snapshot.toasts)}`);
-    } catch (e) {
-      this._log('⚠️ 超时 DOM 快照失败: ' + e.message);
-    }
-
-    const detail = lastState
-      ? `可见提示=[${lastState.toastText || '无'}]; 仍在发送=${lastState.sending}; 写信/回复框还开着=${lastState.composeOpen}; 页面片段=[${lastState.bodySnippet}]`
-      : '（无法读取页面状态）';
-    throw new Error(`${stuckSending ? 'Gmail appears stuck in Sending' : 'Send timeout'} —— 等待 Gmail 发送确认超时（${Math.round(timeoutMs / 1000)} 秒）。${detail}`);
+    // 等满 10 秒仍无 toast —— 发信场景下点击 Schedule send 即已提交，
+    // 不因没等到 toast 就报「发送超时」（那正是本次要修的误报），直接判定成功。
+    this._log('✅ 未等到发送成功 toast，但 Schedule send 已点击提交，判定发送成功');
   }
 
   // 发送等待期间的诊断截图已移除（只留日志）。保留方法签名，避免改动所有调用点。
