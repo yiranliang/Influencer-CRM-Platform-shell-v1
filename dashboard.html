@@ -2387,6 +2387,23 @@
     <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('batchStatusModal')">取消</button><button class="btn-primary" onclick="confirmBatchModifyStatus()">确认修改</button></div></div>
 </div>
 
+<!-- 检查更新弹窗（打开页面时若本地版本落后 GitHub 最新版则弹出，无「不再提示」） -->
+<div id="checkUpdateModal" class="modal">
+    <div class="modal-content" style="width:480px;max-width:92%;">
+        <div class="modal-header"><h3>发现新版本</h3><button onclick="closeModal('checkUpdateModal')">×</button></div>
+        <div class="modal-body" style="font-size:14px;line-height:1.8;color:#334155;">
+            <p style="margin:0 0 12px;">当前版本：<b id="updateCurrentVersion"></b><br>最新版本：<b id="updateLatestVersion"></b></p>
+            <p style="margin:0 0 8px;">请按以下步骤更新：</p>
+            <ol style="margin:0 0 0 18px;padding:0;">
+                <li>关闭程序（关黑窗口）</li>
+                <li>双击 update.bat</li>
+                <li>双击 start.bat 重新启动</li>
+            </ol>
+        </div>
+        <div class="modal-footer"><button class="btn-primary" onclick="closeModal('checkUpdateModal')">知道了</button></div>
+    </div>
+</div>
+
 <!-- 批量修改日期弹窗 -->
 <div id="batchDateModal" class="modal">
     <div class="modal-content"><div class="modal-header"><h3>批量修改日期</h3><button onclick="closeModal('batchDateModal')">×</button></div>
@@ -6717,11 +6734,27 @@
         });
     });
 
+    // ── 检查更新：打开页面时对比本地版本与 GitHub 最新版，落后则弹窗提示 ──
+    function checkUpdate() {
+        fetch('/api/check-update')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (!data || !data.hasUpdate) return; // 无更新（或后端已静默返回 false）则什么都不做
+                var cur = document.getElementById('updateCurrentVersion');
+                var latest = document.getElementById('updateLatestVersion');
+                if (cur) cur.textContent = data.currentVersion || '';
+                if (latest) latest.textContent = data.latestVersion || '';
+                document.getElementById('checkUpdateModal').style.display = 'flex';
+            })
+            .catch(function() { /* 请求失败静默处理，不弹窗不报错 */ });
+    }
+
     loadInfluencers();
     loadEmailConfig();
     loadContractConfig();
     loadTools();
     refreshAnalytics();
+    checkUpdate();
     setInterval(checkAutoStatusUpdate, 24 * 60 * 60 * 1000);
 
     // 页面加载后立即执行同步和渲染
