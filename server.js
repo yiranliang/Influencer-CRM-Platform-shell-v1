@@ -45,6 +45,19 @@ const CONTRACT_CONFIG_FILE = path.join(__dirname, 'contract_config.json');
 const TOOLS_CONFIG_FILE = path.join(__dirname, 'tools_config.json');
 const HOMEPAGE_CHECK_FILE = path.join(__dirname, 'pipeline_homepage_check.json');
 
+// 备份/恢复用的数据文件清单（与 backup.bat / runStartupBackup 保持一致，不含凭证）
+// 凭证文件（credentials.json / token.json / apify_config.json）不在此列，绝不随数据备份复制
+const DATA_BACKUP_FILES = [
+  'influencer_data.json',
+  'pipeline_data.json',
+  'cd_data.json',
+  'payment_data.json',
+  'email_config.json',
+  'contract_config.json',
+  'tools_config.json',
+  'pipeline_homepage_check.json'
+];
+
 // Apify 配置（凭证不入库，读取根目录 apify_config.json）
 let APIFY_TOKEN = '';
 try {
@@ -140,6 +153,28 @@ function compareVersions(a, b) {
     if (x < y) return -1;
   }
   return 0;
+}
+
+// 生成本地时间戳 YYYYMMDD_HHMMSS，与 backup.bat 的备份文件夹命名保持一致
+function backupTimestamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return '' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
+    + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+}
+
+// 把 DATA_BACKUP_FILES 中「存在」的数据文件复制进指定目录，返回复制数（目录不存在会先建）
+function copyDataFilesInto(dir) {
+  fs.mkdirSync(dir, { recursive: true });
+  let copied = 0;
+  for (const file of DATA_BACKUP_FILES) {
+    const src = path.join(__dirname, file);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, path.join(dir, file));
+      copied++;
+    }
+  }
+  return copied;
 }
 
 // —— Apify 异步任务辅助（相似发现轮询用）——
@@ -1267,6 +1302,78 @@ function createServer() {
         // 静默：任何异常都按「无更新」处理，不打 error 日志，不阻塞前端
         sendJSON(res, 200, { hasUpdate: false, currentVersion: APP_VERSION, latestVersion: '' });
       });
+    return;
+  }
+
+  // POST /api/backup — 立即备份数据文件到 backups/<时间戳>/（纯 Node.js 复制，不调 backup.bat）
+  if (pathname === '/api/backup' && req.method === 'POST') {
+    try {
+      const timestamp = backupTimestamp();
+      const dir = path.join(__dirname, 'backups', timestamp);
+      const fileCount = copyDataFilesInto(dir);
+      console.log('[backup] created backups/' + timestamp + ' (' + fileCount + ' files)');
+      sendJSON(res, 200, { success: true, timestamp, fileCount });
+    } catch (err) {
+      console.error('[backup] create failed:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // GET /api/backup/list — 列出所有数据备份（排除 _credentials / _onstartup / 非目录），最新在前
+  if (pathname === '/api/backup/list' && req.method === 'GET') {
+    try {
+      const root = path.join(__dirname, 'backups');
+      const entries = fs.existsSync(root) ? fs.readdirSync(root, { withFileTypes: true }) : [];
+      const list = [];
+      for (const e of entries) {
+        if (!e.isDirectory()) continue; // 跳过 backup.log 等文件
+        if (e.name === '_credentials' || e.name === '_onstartup') continue; // 排除凭证和启动快照
+        const dir = path.join(root, e.name);
+        const files = fs.readdirSync(dir).filter(f => fs.statSync(path.join(dir, f)).isFile());
+        let totalSize = 0;
+        for (const f of files) totalSize += fs.statSync(path.join(dir, f)).size;
+        list.push({ timestamp: e.name, files, totalSize });
+      }
+      // 时间戳格式 YYYYMMDD_HHMMSS，字符串倒序即时间倒序（最新在前）
+      list.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+      sendJSON(res, 200, { success: true, backups: list });
+    } catch (err) {
+      console.error('[backup] list failed:', err.message);
+      sendJSON(res, 500, { error: err.message });
+    }
+    return;
+  }
+
+  // POST /api/backup/restore — 恢复某备份（恢复前先自动备份当前数据，防止恢复错版本）
+  if (pathname === '/api/backup/restore' && req.method === 'POST') {
+    parseBody(req).then((body) => {
+      try {
+        const timestamp = (body && typeof body.timestamp === 'string') ? body.timestamp.trim() : '';
+        if (!timestamp) { sendJSON(res, 400, { error: '缺少 timestamp' }); return; }
+        const srcDir = path.join(__dirname, 'backups', timestamp);
+        if (!fs.existsSync(srcDir)) { sendJSON(res, 404, { error: '备份不存在: ' + timestamp }); return; }
+
+        // 恢复前先自动备份当前数据（备份到 backups/<新时间戳>/），避免恢复错了无法回退
+        const preTimestamp = backupTimestamp();
+        copyDataFilesInto(path.join(__dirname, 'backups', preTimestamp));
+
+        // 从备份文件夹复制数据文件回项目根目录
+        let restoredCount = 0;
+        for (const file of DATA_BACKUP_FILES) {
+          const src = path.join(srcDir, file);
+          if (fs.existsSync(src)) {
+            fs.copyFileSync(src, path.join(__dirname, file));
+            restoredCount++;
+          }
+        }
+        console.log('[backup] restored ' + restoredCount + ' file(s) from backups/' + timestamp + ' (pre-restore auto-backup: ' + preTimestamp + ')');
+        sendJSON(res, 200, { success: true, restoredCount, preBackupTimestamp: preTimestamp });
+      } catch (err) {
+        console.error('[backup] restore failed:', err.message);
+        sendJSON(res, 500, { error: err.message });
+      }
+    }).catch(err => sendJSON(res, 400, { error: err.message }));
     return;
   }
 
