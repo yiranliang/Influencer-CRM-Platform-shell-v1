@@ -1355,45 +1355,37 @@ async _handleInsertFilesDialog() {
   // ─── 修改主题 ──────────────────────────────────
 
   async _modifySubject(subject) {
-    // 为什么改用「键盘输入 + 读回验证」而不是直接 JS 赋值：
+    // 为什么用「locator.fill + 读回验证」而不是直接 JS 赋值：
     // Gmail 主题框是 React 受控组件，直接 box.value = xxx 只改了 DOM 值、没触发 React 状态更新，
     // 模板稍后异步渲染时又会用模板自带的 subject 把值盖回去，造成「日志说已填写、实际没变」。
-    // 用 page.keyboard.type() 模拟真实键盘输入，走 Gmail 自己的输入事件链路，React 会正常接收；
-    // 再读回 input.value 验证是否等于目标，失败重试 3 次（覆盖→不匹配→重试），防模板异步覆盖。
+    // 用 locator.fill 避免焦点丢失——之前的 page.keyboard.type() 焦点不在主题框上，
+    // 标题文字会被打到正文里；fill 会先点击元素确保焦点，再走 Gmail 自己的输入事件链路，
+    // React 会正常接收；再读回 input.value 验证是否等于目标，失败重试 3 次，防模板异步覆盖。
     const newSubject = subject || 'PR Box of June: Saodimallsu Collab Invitation';
 
     for (let attempt = 0; attempt < 3; attempt++) {
-      // 找到主题框并 focus + 清空（清空也要触发 input，让 React 知道值已被清掉）
-      const found = await this.page.evaluate(() => {
-        const box = document.querySelector('input[name="subjectbox"]');
-        if (!box) return false;
-        box.focus();
-        box.value = '';
-        box.dispatchEvent(new Event('input', { bubbles: true }));
-        return true;
-      });
-      if (!found) {
-        await this._sleep(500);
-        continue;
-      }
-
-      // 用键盘逐字输入（delay 模拟人手），Gmail 更认可这种方式
-      await this.page.keyboard.type(newSubject, { delay: 10 });
-      await this._sleep(300);
-
-      // 读回验证：主题框值必须等于目标，否则可能是模板异步覆盖了
-      const current = await this.page.evaluate(() => {
-        const box = document.querySelector('input[name="subjectbox"]');
-        return box ? box.value : '';
-      });
-
-      if (current === newSubject) {
-        this._log(`已填写主题: ${newSubject}`);
+      try {
+        const subjectBox = this.page.locator('input[name="subjectbox"]');
+        await subjectBox.waitFor({ state: 'visible', timeout: 3000 });
+        // click 先确保焦点落在主题框上，避免 fill 输入打到正文
+        await subjectBox.click();
+        // 先清空再填入，fill 内部会聚焦 + 触发 input，React 能感知到值的变化
+        await subjectBox.fill('');
+        await subjectBox.fill(newSubject);
         await this._sleep(300);
-        return;
-      }
 
-      this._log(`主题验证失败（尝试 ${attempt + 1}/3），当前值="${current}"`);
+        // 读回验证：主题框值必须等于目标，否则可能是模板异步覆盖了
+        const current = await subjectBox.inputValue();
+        if (current === newSubject) {
+          this._log(`已填写主题: ${newSubject}`);
+          await this._sleep(300);
+          return;
+        }
+
+        this._log(`主题验证失败（尝试 ${attempt + 1}/3），当前值="${current}"`);
+      } catch (e) {
+        this._log(`主题填写异常（尝试 ${attempt + 1}/3）: ${e.message}`);
+      }
       await this._sleep(500);
     }
 
