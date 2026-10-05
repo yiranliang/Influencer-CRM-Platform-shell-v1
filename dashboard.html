@@ -2301,6 +2301,21 @@
                 <h3 style="margin:0 0 12px 0;font-size:15px;">配置状态</h3>
                 <div id="configStatusBody" style="font-size:13px;color:#64748b;">加载中...</div>
             </div>
+            <!-- 备份管理：不用敲 CMD，即可立即备份 / 查看备份列表 / 恢复某个备份 -->
+            <div id="backupCard" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
+                <h3 style="margin:0 0 12px 0;font-size:15px;">备份管理</h3>
+                <p style="color:#94a3b8;font-size:13px;margin-bottom:12px;">
+                    备份的数据文件：红人库、Pipeline、C&D、付款、邮件/合同/工具配置、首页检查。凭证文件不随数据备份。
+                </p>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button class="btn-primary" onclick="doBackup()">💾 立即备份</button>
+                    <button class="btn-secondary" onclick="toggleBackupList()">查看备份</button>
+                    <span id="backupStatus" style="font-size:13px;color:#94a3b8;"></span>
+                </div>
+                <div id="backupList" style="display:none;margin-top:12px;">
+                    <!-- 备份列表动态渲染 -->
+                </div>
+            </div>
             <div id="setting-proxy" style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:20px;">
                 <h3 style="margin:0 0 12px 0;font-size:15px;">网络代理</h3>
                 <p style="color:#94a3b8;font-size:13px;margin-bottom:12px;">
@@ -3105,6 +3120,109 @@
             if (statusEl) { statusEl.textContent = '❌ 读取文件失败'; statusEl.style.color = '#ef4444'; }
         };
         reader.readAsText(file);
+    }
+
+    // ── 备份管理 ──
+    // 立即备份：调后端把数据文件复制到 backups/<时间戳>/
+    function doBackup() {
+        var statusEl = document.getElementById('backupStatus');
+        if (statusEl) statusEl.textContent = '备份中...';
+        fetch('/api/backup', { method: 'POST' })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data && data.success) {
+                    showToast('备份成功（' + data.fileCount + ' 个文件）', 'success');
+                    if (statusEl) statusEl.textContent = '✅ 已备份 ' + formatBackupTime(data.timestamp);
+                    // 若备份列表当前可见则顺带刷新
+                    if (document.getElementById('backupList').style.display !== 'none') loadBackupList();
+                } else {
+                    showToast('备份失败', 'error');
+                    if (statusEl) statusEl.textContent = '❌ 备份失败';
+                }
+            })
+            .catch(function(err) {
+                console.error('备份失败:', err);
+                showToast('备份失败', 'error');
+                if (statusEl) statusEl.textContent = '❌ 备份失败';
+            });
+    }
+
+    // 切换备份列表显示/隐藏；展开时拉取最新列表
+    function toggleBackupList() {
+        var list = document.getElementById('backupList');
+        if (list.style.display === 'none') {
+            list.style.display = 'block';
+            loadBackupList();
+        } else {
+            list.style.display = 'none';
+        }
+    }
+
+    // 时间戳 YYYYMMDD_HHMMSS → 2026-10-05 21:53:01
+    function formatBackupTime(ts) {
+        if (!ts || ts.length < 15) return ts || '';
+        return ts.slice(0, 4) + '-' + ts.slice(4, 6) + '-' + ts.slice(6, 8) + ' '
+            + ts.slice(9, 11) + ':' + ts.slice(11, 13) + ':' + ts.slice(13, 15);
+    }
+
+    // 字节 → 可读大小（KB/MB）
+    function formatBackupSize(bytes) {
+        if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        if (bytes >= 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return bytes + ' B';
+    }
+
+    // 拉取备份列表并渲染（每项：时间 / 文件数 / 大小 / 恢复按钮）
+    function loadBackupList() {
+        var list = document.getElementById('backupList');
+        list.innerHTML = '<span style="color:#94a3b8;font-size:13px;">加载中...</span>';
+        fetch('/api/backup/list')
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                var backups = (data && data.backups) || [];
+                if (backups.length === 0) {
+                    list.innerHTML = '<span style="color:#94a3b8;font-size:13px;">暂无备份</span>';
+                    return;
+                }
+                var html = '<div style="border-top:1px solid #e5e7eb;">';
+                backups.forEach(function(b) {
+                    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;">'
+                        + '<div>'
+                        + '<div style="font-size:14px;font-weight:600;color:#334155;">' + formatBackupTime(b.timestamp) + '</div>'
+                        + '<div style="font-size:12px;color:#94a3b8;">' + (b.files ? b.files.length : 0) + ' 个文件 · ' + formatBackupSize(b.totalSize || 0) + '</div>'
+                        + '</div>'
+                        + '<button class="btn-secondary" onclick="restoreBackup(\'' + b.timestamp + '\')" style="font-size:12px;padding:4px 12px;">恢复</button>'
+                        + '</div>';
+                });
+                html += '</div>';
+                list.innerHTML = html;
+            })
+            .catch(function(err) {
+                console.error('加载备份列表失败:', err);
+                list.innerHTML = '<span style="color:#ef4444;font-size:13px;">加载备份列表失败</span>';
+            });
+    }
+
+    // 恢复某备份：二次确认后调后端（后端会先自动备份当前数据，防止恢复错版本）
+    function restoreBackup(timestamp) {
+        if (!confirm('确定恢复？当前数据会被覆盖。恢复前会自动备份当前数据。')) return;
+        fetch('/api/backup/restore', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ timestamp: timestamp })
+        })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data && data.success) {
+                    showToast('恢复成功，请刷新页面', 'success');
+                } else {
+                    showToast('恢复失败：' + ((data && data.error) || '未知错误'), 'error');
+                }
+            })
+            .catch(function(err) {
+                console.error('恢复失败:', err);
+                showToast('恢复失败', 'error');
+            });
     }
 
     // ── 配置状态卡片 ──
