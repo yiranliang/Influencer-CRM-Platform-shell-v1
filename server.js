@@ -32,6 +32,8 @@ if (PROXY_URL) {
   console.log('[proxy] no proxy, direct connection');
 }
 const PORT = process.env.PORT || 3000;
+// 当前版本号：update.bat 更新后同步改成新值（前端「检查更新」弹窗以此对比 GitHub 最新 tag）
+const APP_VERSION = '1.0.1';
 // ⚠️ 默认发送时间（如需修改，改这里）
 const DEFAULT_SCHEDULE_TIME = '23:10';
 const INFLUENCER_DATA_FILE = path.join(__dirname, 'influencer_data.json');
@@ -123,6 +125,21 @@ function parseBody(req) {
     });
     req.on('error', reject);
   });
+}
+
+// 逐段数值比较版本号：'1.0.10' vs '1.0.9' 能正确判断，缺段按 0 处理
+// 返回 1（a>b）/ 0（相等）/ -1（a<b）
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const x = pa[i] || 0;
+    const y = pb[i] || 0;
+    if (x > y) return 1;
+    if (x < y) return -1;
+  }
+  return 0;
 }
 
 // —— Apify 异步任务辅助（相似发现轮询用）——
@@ -1221,6 +1238,35 @@ function createServer() {
         sendJSON(res, 500, { error: err.message });
       }
     });
+    return;
+  }
+
+  // GET /api/check-update — 对比本地版本与 GitHub 最新 release，返回是否需更新
+  // 失败时静默返回 { hasUpdate: false }，不阻塞、不报错（网络/超时/无 release 都算「无更新」）
+  if (pathname === '/api/check-update' && req.method === 'GET') {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000); // 10 秒超时，避免卡住页面加载
+    fetch('https://api.github.com/repos/yiranliang/Influencer-CRM-Platform-shell-v1/releases/latest', {
+      headers: { 'User-Agent': 'Influencer-CRM-Platform', 'Accept': 'application/vnd.github+json' },
+      signal: controller.signal
+    })
+      .then((resp) => {
+        if (!resp.ok) throw new Error('GitHub HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then((data) => {
+        clearTimeout(timer);
+        // 去掉 tag_name 的 v 前缀，兼容 v1.0.2 / 1.0.2 两种写法
+        const latestVersion = String((data && data.tag_name) || '').replace(/^v/i, '');
+        if (!latestVersion) throw new Error('release 缺少 tag_name');
+        const hasUpdate = compareVersions(latestVersion, APP_VERSION) > 0;
+        sendJSON(res, 200, { hasUpdate, currentVersion: APP_VERSION, latestVersion });
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        // 静默：任何异常都按「无更新」处理，不打 error 日志，不阻塞前端
+        sendJSON(res, 200, { hasUpdate: false, currentVersion: APP_VERSION, latestVersion: '' });
+      });
     return;
   }
 
