@@ -1213,23 +1213,32 @@ class GmailAutomation extends EventEmitter {
   // ─── 3. 选择模板 ─────────────────────────────────
 
   async _selectTemplate(templateName) {
-    // 模板面板出现在右侧，找到目标模板
+    // 模板面板出现在右侧，找到目标模板。
+    // 选择器重排：把 div[role="menuitem"] / div[role="option"] 提到最前，
+    // 因为 span/text 这些内层元素常被工具栏或正文框遮挡（intercepts pointer events），
+    // 真正可点击的容器是 role="menuitem"/"option"，优先命中它们。
     const template = await this._waitForAnyVisible([
+      `div[role="menuitem"]:has-text("${templateName}")`,
+      `div[role="option"]:has-text("${templateName}")`,
       `text="${templateName}"`,
       `span:has-text("${templateName}")`,
-      `div:has-text("${templateName}")`,
-      `td:has-text("${templateName}")`,
     ]);
 
     if (template) {
-      await template.click();
+      try {
+        await template.click({ timeout: 5000 });
+      } catch (e) {
+        // 常规点击仍被遮挡时用 force 兜底，绕过 Playwright 的 pointer-events 校验
+        this._log(`常规点击失败（${e.message.slice(0,80)}），尝试 force 点击`);
+        await template.click({ force: true, timeout: 5000 });
+      }
       this._log(`已选择模板: ${templateName}`);
       await this._sleep(2500);
-      
+
       // ===== 自动处理 Insert Files 弹窗 =====
       await this._handleInsertFilesDialog();
       // ====================================
-      
+
     } else {
       throw new Error(`无法找到模板: "${templateName}"，请确认模板已创建且名称完全一致`);
     }
@@ -1365,7 +1374,8 @@ async _handleInsertFilesDialog() {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const subjectBox = this.page.locator('input[name="subjectbox"]');
+        // 页面可能有多个 subjectbox（残留的写信窗口），用 last() 取最新的那个，避免 strict mode 报错
+        const subjectBox = this.page.locator('input[name="subjectbox"]').last();
         await subjectBox.waitFor({ state: 'visible', timeout: 3000 });
         // click 先确保焦点落在主题框上，避免 fill 输入打到正文
         await subjectBox.click();
