@@ -33,7 +33,7 @@ if (PROXY_URL) {
 }
 const PORT = process.env.PORT || 3000;
 // 当前版本号：update.bat 更新后同步改成新值（前端「检查更新」弹窗以此对比 GitHub 最新 tag）
-const APP_VERSION = '1.0.1';
+const APP_VERSION = '1.0.2';
 // ⚠️ 默认发送时间（如需修改，改这里）
 const DEFAULT_SCHEDULE_TIME = '23:10';
 const INFLUENCER_DATA_FILE = path.join(__dirname, 'influencer_data.json');
