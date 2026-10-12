@@ -6936,8 +6936,9 @@
         return uniqueUrls.size;
     }
 
-    // ★ findSampleQtyForMonth 结果缓存（key: email|monthKey → sampleQty）。
-    //   结果仅依赖 pipelineData 的 email/sampleDate/sampleQty，数据变更后须调用 clearSampleQtyCache() 清空。
+    // ★ findSampleQtyForMonth 结果缓存（key: email|name|monthKey → sampleQty）。
+    //   结果仅依赖 pipelineData 的 email/name/sampleDate/sampleQty，数据变更后须调用 clearSampleQtyCache() 清空。
+    //   key 里必须带 name：C&D 记录 email 为空时，同一月份所有行的 key 都会撞成 '|月份'，会把第一条的结果串给后面所有行。
     var sampleQtyCache = {};
 
     function clearSampleQtyCache() {
@@ -6945,18 +6946,20 @@
     }
 
     // 从 Pipeline 动态获取寄样数量（当月 → 上月 → 上上月... 最多追溯12个月，找不到 Pipeline 数据时返回 0）
-    function findSampleQtyForMonth(email, monthKey) {
-        if (!email || !monthKey) {
+    // ★ 匹配规则：email 优先，name 兜底。C&D 的 CSV 模板没有 email 列，靠 cdSyncEmails 从 Outreach 补，
+    //   漏同步的月份会整月 email 为空（如 2026-09），此时只能用 name 去 Pipeline 里匹配。
+    function findSampleQtyForMonth(email, monthKey, name) {
+        if ((!email && !name) || !monthKey) {
             return 0;
         }
 
         // 缓存命中，直接返回
-        var cacheKey = email + '|' + monthKey;
+        var cacheKey = (email || '') + '|' + (name || '') + '|' + monthKey;
         if (sampleQtyCache[cacheKey] !== undefined) {
             return sampleQtyCache[cacheKey];
         }
 
-        var targetEmail = email.trim().toLowerCase();
+        var targetEmail = email ? email.trim().toLowerCase() : '';
 
         // 解析月份，生成月份列表：当月、上月、上上月... 最多追溯12个月
         var parts = monthKey.split('-');
@@ -6979,11 +6982,15 @@
             var targetMonth = monthKeys[i];
 
             var record = pipelineData.find(function(p) {
-                if (!p.email || !p.sampleDate || !p.sampleQty) return false;
-                var pEmail = p.email.trim().toLowerCase();
-                if (pEmail !== targetEmail) return false;
+                if (!p.sampleDate || !p.sampleQty) return false;
                 var sampleMonth = p.sampleDate.substring(0, 7).replace('/', '-');
-                return sampleMonth === targetMonth;
+                if (sampleMonth !== targetMonth) return false;
+                // email 优先
+                if (targetEmail && p.email && p.email.trim().toLowerCase() === targetEmail) {
+                    return true;
+                }
+                // email 空时用 name 兜底匹配
+                return !!(name && p.name === name);
             });
 
             if (record && record.sampleQty) {
@@ -7001,7 +7008,7 @@
         // ★ totalFulfilledQty 只从帖子计算，不从外部写入（C&D 数据仅来自 CSV 导入）
         item.totalFulfilledQty = posts.length;
         item.liveCount = getUniqueUrlCount(posts);
-        var sampleQty = findSampleQtyForMonth(item.email, item.monthKey) || 0;
+        var sampleQty = findSampleQtyForMonth(item.email, item.monthKey, item.name) || 0;
         item.pendingQty = Math.max(0, sampleQty - item.totalFulfilledQty);
         item.fulfillmentRate = (sampleQty > 0) ? Math.round(item.totalFulfilledQty / sampleQty * 100) : 0;
         item.totalViews = posts.reduce(function(s, p) { return s + (p.views || 0); }, 0);
@@ -7052,7 +7059,7 @@
             r.totalLiveCount += record.liveCount || 0;
             r.monthCount = r.monthKeys.length;
 
-            var sampleQty = findSampleQtyForMonth(record.email, record.monthKey);
+            var sampleQty = findSampleQtyForMonth(record.email, record.monthKey, record.name);
             r.totalSampleQty += (sampleQty || 0);
         });
 
@@ -7201,7 +7208,7 @@
         var uniqueUrls = new Set();  // 用于统计去重后的视频链接数量
 
         filteredData.forEach(function(item) {
-            totalSample += findSampleQtyForMonth(item.email, item.monthKey) || 0;
+            totalSample += findSampleQtyForMonth(item.email, item.monthKey, item.name) || 0;
             totalFulfilled += item.totalFulfilledQty || 0;
             totalOrders += item.totalOrders || 0;
             if (item.name) uniqueNames.add(item.name);
@@ -7530,7 +7537,7 @@
                 var avgViews = (item.posts && item.posts.length > 0) ? Math.round((item.totalViews || 0) / item.posts.length) : 0;
 
                 // 从 Pipeline 动态获取寄样数量
-                var sampleQty = findSampleQtyForMonth(item.email, item.monthKey);
+                var sampleQty = findSampleQtyForMonth(item.email, item.monthKey, item.name);
 
                 // ★ 履约率列：Pipeline 无寄样数据（sampleQty=0）时不显示 0%，提示先导入寄样数据
                 var rateCell = (sampleQty > 0)
