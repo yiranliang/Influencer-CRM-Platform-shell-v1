@@ -4179,6 +4179,17 @@
 
         // 更新 Outreach 数据
         if (newName) item.name = newName;
+
+        // ★ 记录旧 ID 用于历史数据映射：改名时把旧 name 追加到 aliases（去重），
+        //   这样外部 CSV / 历史数据里用旧 ID 时，C&D 导入能映射回当前 name。
+        if (oldName && item.name && oldName.trim() !== item.name.trim()) {
+            item.aliases = Array.isArray(item.aliases) ? item.aliases : [];
+            var alias = oldName.trim();
+            if (alias && item.aliases.indexOf(alias) === -1) {
+                item.aliases.push(alias);
+            }
+        }
+
         if (firstNameInput) item.firstName = firstNameInput.value.trim();
         if (newEmailValue && newEmailValue !== oldEmail) {
             item.email = newEmailValue;
@@ -7055,6 +7066,21 @@
             monthKeys.push(y + '-' + String(m).padStart(2, '0'));
         }
 
+        // ★ 记录旧 ID 用于历史数据映射：Pipeline 里的 name 可能还是旧 ID，
+        //   所以把当前 name 和 aliases 都当作同一个人的候选名（只解析一次，避免每个月重复查找）。
+        var nameVariants = name ? [name] : [];
+        if (name) {
+            var infForName = allInfluencers.find(function(inf) {
+                return inf.name === name || (Array.isArray(inf.aliases) && inf.aliases.indexOf(name) !== -1);
+            });
+            if (infForName) {
+                if (infForName.name && nameVariants.indexOf(infForName.name) === -1) nameVariants.push(infForName.name);
+                (infForName.aliases || []).forEach(function(a) {
+                    if (a && nameVariants.indexOf(a) === -1) nameVariants.push(a);
+                });
+            }
+        }
+
         // 遍历月份查找
         for (var i = 0; i < monthKeys.length; i++) {
             var targetMonth = monthKeys[i];
@@ -7067,8 +7093,8 @@
                 if (targetEmail && p.email && p.email.trim().toLowerCase() === targetEmail) {
                     return true;
                 }
-                // email 空时用 name 兜底匹配
-                return !!(name && p.name === name);
+                // email 空时用 name 兜底匹配（含旧 ID）
+                return nameVariants.length > 0 && nameVariants.indexOf(p.name) !== -1;
             });
 
             if (record && record.sampleQty) {
@@ -7118,7 +7144,12 @@
             if (hit) return hit;
         }
         if (n) {
-            return allInfluencers.find(function(i) { return cdNormalizeName(i.name) === n; }) || null;
+            var byName = allInfluencers.find(function(i) { return cdNormalizeName(i.name) === n; });
+            if (byName) return byName;
+            // ★ 记录旧 ID 用于历史数据映射：当前 name 找不到时，再查 aliases
+            return allInfluencers.find(function(i) {
+                return Array.isArray(i.aliases) && i.aliases.some(function(a) { return cdNormalizeName(a) === n; });
+            }) || null;
         }
         return null;
     }
@@ -7206,6 +7237,14 @@
             var n = cdNormalizeName(inf.name);
             if (e && !infByEmail[e]) infByEmail[e] = inf;
             if (n && !infByName[n]) infByName[n] = inf;
+        });
+        // ★ 记录旧 ID 用于历史数据映射：aliases 也进 name 索引（当前 name 优先）
+        (allInfluencers || []).forEach(function(inf) {
+            if (!inf || !Array.isArray(inf.aliases)) return;
+            inf.aliases.forEach(function(oldName) {
+                var n = cdNormalizeName(oldName);
+                if (n && !infByName[n]) infByName[n] = inf;
+            });
         });
         var paidEmail = {}, paidName = {}, paidId = {};
         (paymentData || []).forEach(function(p) {
@@ -7407,9 +7446,14 @@
 
     function cdSyncEmails() {
         cdData.forEach(function(item) {
+            var itemName = String(item.name || '').toLowerCase();
             var influencer = allInfluencers.find(function(i) {
-                return (i.name && item.name && i.name.toLowerCase() === item.name.toLowerCase()) ||
-                       (i.email && item.email && i.email.toLowerCase() === item.email.toLowerCase());
+                if (i.name && itemName && i.name.toLowerCase() === itemName) return true;
+                if (i.email && item.email && i.email.toLowerCase() === item.email.toLowerCase()) return true;
+                // ★ 记录旧 ID 用于历史数据映射：历史 C&D 记录可能还挂着改名前的旧 name
+                return Array.isArray(i.aliases) && i.aliases.some(function(a) {
+                    return a && String(a).toLowerCase() === itemName;
+                });
             });
             if (influencer) {
                 if (!item.email || item.email === '') item.email = influencer.email;
@@ -8544,6 +8588,20 @@
                 var vIdx = headers.findIndex(function(h) { return h.includes('播放') || h.includes('View'); });
                 var oIdx = headers.findIndex(function(h) { return h.includes('出单') || h.includes('Order'); });
 
+                // ★ 记录旧 ID 用于历史数据映射：先建「当前 name + 旧 aliases」→ 红人 的索引，
+                //   CSV 里可能是改名前的旧 ID，导入时统一映射到当前 name。
+                //   两轮构建：当前 name 优先，aliases 只在没有同名当前 ID 时兜底。
+                var nameMap = {};
+                allInfluencers.forEach(function(inf) {
+                    if (inf && inf.name) nameMap[inf.name] = inf;
+                });
+                allInfluencers.forEach(function(inf) {
+                    if (!inf || !Array.isArray(inf.aliases)) return;
+                    inf.aliases.forEach(function(oldName) {
+                        if (oldName && !nameMap[oldName]) nameMap[oldName] = inf;
+                    });
+                });
+
                 // 按「红人ID + 月份」分组，保留所有帖子行（不按链接去重）
                 var groups = {};
                 var added = 0;
@@ -8552,13 +8610,19 @@
                     if (cols.length < 2) continue;
                     var name = (nameIdx >= 0 ? cols[nameIdx]?.trim() : '') || '';
                     if (!name) continue;
+
+                    // ★ 记录旧 ID 用于历史数据映射：CSV 里的旧 ID → 当前 name，
+                    //   后续分组、存储、与已有 C&D 记录比对都用 finalName。
+                    var matchedInf = nameMap[name];
+                    var finalName = matchedInf ? matchedInf.name : name;
+
                     var postDate = dateIdx >= 0 ? cols[dateIdx]?.trim() : '';
                     var monthKey = postDate ? postDate.substring(0, 7).replace('/', '-') : 'unknown';
-                    var key = name + '|' + monthKey;  // 仅按红人+月份分组，不按链接去重
+                    var key = finalName + '|' + monthKey;  // 仅按红人+月份分组，不按链接去重
                     if (!groups[key]) {
                         groups[key] = {
                             id: 'cd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11),
-                            email: '', name: name,
+                            email: '', name: finalName,
                             monthKey: monthKey,
                             posts: [], isManual: false
                         };
