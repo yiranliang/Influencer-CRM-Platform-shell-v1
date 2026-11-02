@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1559,6 +1559,27 @@
         .btn-primary-small { font-size: 11px; padding: 2px 6px; }
         .icon-btn { font-size: 14px; padding: 3px 5px; }
 
+        /* ── C&D 复邀优化：First Name 内联编辑 / 可复邀名单 ── */
+        .cd-fn-input {
+            width: 96px; padding: 3px 6px; border: 1px solid transparent; border-radius: 6px;
+            font-size: 12px; background: transparent; color: #1e293b; font-family: inherit;
+        }
+        .cd-fn-input:hover { border-color: #e2e8f0; background: #fff; }
+        .cd-fn-input:focus { outline: none; border-color: #4f46e5; background: #fff; box-shadow: 0 0 0 3px rgba(79,70,229,.1); }
+        .cd-fn-input.has-value { color: #166534; }
+        .cd-fn-input.missing { background: #fff7ed; border-color: #fdba74; color: #c2410c; }
+        .cd-fn-input.missing::placeholder { color: #f97316; font-weight: 600; }
+        .cd-cand-table { width: 100%; border-collapse: collapse; }
+        .cd-cand-table th { position: sticky; top: 0; background: #f8fafc; z-index: 1; }
+        .cd-cand-table th, .cd-cand-table td { padding: 6px 8px; font-size: 12px; border-bottom: 1px solid #eef2f7; white-space: nowrap; }
+        .cd-cand-badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 11px; margin: 1px 4px 1px 0; white-space: nowrap; }
+        .cd-cand-badge.orders { background: #dcfce7; color: #166534; }
+        .cd-cand-badge.views { background: #dbeafe; color: #1e40af; }
+        .cd-cand-badge.warn { background: #fee2e2; color: #991b1b; }
+        .cd-cand-criteria { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; font-size: 13px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 10px; }
+        .cd-cand-criteria input[type="number"] { width: 90px; padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 6px; }
+        .cd-cand-criteria select { padding: 4px 6px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; }
+
     </style>
 </head>
 <body>
@@ -1974,12 +1995,22 @@
                         <button class="btn-secondary" onclick="cdImportCSV()">批量导入</button>
                         <button class="btn-danger" id="cdDeleteSelectedBtn" onclick="deleteSelectedCDRecords()" style="display:none;">删除选中</button>
                         <button class="btn-secondary" id="reinviteBtn" onclick="openReinviteModal()" disabled>✉️ 复邀</button>
+                        <button class="btn-secondary" onclick="openReinviteCandidates()" title="按出单 / 播放量自动筛选，并排除付费红人">🎯 可复邀名单</button>
                         <button class="btn-secondary" onclick="refreshCDData()">🔄 刷新</button>
                     </div>
                     <div class="toolbar-right">
                         <button class="btn-view-toggle" id="cdViewToggle" onclick="toggleCDView()">
                             📊 红人汇总
                         </button>
+                        <span id="cdReinviteFilterWrap" style="display:none;align-items:center;gap:6px;">
+                            <select id="cdReinviteFilter" onchange="cdFilterTable()" class="cd-month-select" title="汇总视图专用筛选">
+                                <option value="all">全部红人</option>
+                                <option value="candidate">可复邀（出单或播放≥5k）</option>
+                                <option value="missingName">缺 First Name</option>
+                                <option value="paid">已付费</option>
+                            </select>
+                            <span id="cdFirstNameStat" style="font-size:12px;color:#b45309;white-space:nowrap;"></span>
+                        </span>
                         <select id="cdMonthFilter" onchange="cdFilterTable()" class="cd-month-select"><option value="all">全部月份</option></select>
                         <div class="search-wrapper cd-search-wrapper">
                             <input type="text" id="cdSearch" placeholder="搜索红人ID或邮箱..." oninput="handleSearchInput(this)" class="cd-search-input">
@@ -1990,7 +2021,7 @@
                 <div class="cd-table-container">
                     <table class="cd-table"><thead id="cdTableHead"><tr>
                         <th><input type="checkbox" id="cdSelectAll" onclick="cdToggleSelectAll()" title="全选/取消全选"></th>
-                        <th>月份</th><th>红人ID</th><th>邮箱</th><th>寄样数量</th><th>已履约</th><th>履约率</th><th>上线数量</th>
+                        <th>月份</th><th>红人ID</th><th>First Name</th><th>邮箱</th><th>寄样数量</th><th>已履约</th><th>履约率</th><th>上线数量</th>
                         <th onclick="sortCDTable('totalViews')" style="cursor:pointer;">平均播放量(k) <span id="cd-sort-views">⇅</span></th>
                         <th onclick="sortCDTable('totalOrders')" style="cursor:pointer;">累计出单数 <span id="cd-sort-orders">⇅</span></th>
                     </tr></thead>
@@ -2511,6 +2542,48 @@
             <div class="form-group"><label>发送时间</label><input type="time" id="reinviteScheduleTime" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;"></div>
         </div>
         <div class="modal-footer"><button class="btn-secondary" onclick="closeModal('reinviteModal')">取消</button><button class="btn-primary" onclick="confirmReinvite()">确认发送</button></div>
+    </div>
+</div>
+
+<!-- C&D 可复邀名单（智能筛选） -->
+<div id="reinviteCandidatesModal" class="modal">
+    <div class="modal-content" style="width:1080px;max-width:96%;">
+        <div class="modal-header"><h3>🎯 可复邀名单（智能筛选）</h3><button onclick="closeModal('reinviteCandidatesModal')">×</button></div>
+        <div class="modal-body">
+            <div class="cd-cand-criteria">
+                <span style="font-weight:600;color:#334155;">筛选条件</span>
+                <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="cdCandRequireOrders" checked onchange="cdRenderCandidates()"> 有出单</label>
+                <span style="color:#94a3b8;">或</span>
+                <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="cdCandRequireViews" checked onchange="cdRenderCandidates()"> 播放量 ≥</label>
+                <input type="number" id="cdCandViewsThreshold" value="5000" min="0" step="500" onchange="cdRenderCandidates()">
+                <select id="cdCandViewsMode" title="播放量按哪个口径判定" onchange="cdRenderCandidates()">
+                    <option value="max">单帖最高</option>
+                    <option value="avg">平均播放</option>
+                </select>
+                <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="cdCandExcludePaid" checked onchange="cdRenderCandidates()"> 排除付费红人</label>
+                <button class="btn-secondary" onclick="cdRenderCandidates()" style="padding:5px 12px;font-size:12px;">重新筛选</button>
+            </div>
+            <div id="cdCandStats" style="font-size:12px;color:#475569;margin-bottom:8px;"></div>
+            <div style="max-height:52vh;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;">
+                <table class="cd-cand-table">
+                    <thead><tr>
+                        <th style="width:32px;"><input type="checkbox" id="cdCandSelectAll" checked onchange="cdCandToggleAll(this.checked)" title="全选/取消全选"></th>
+                        <th>红人ID</th><th>邮箱</th><th>First Name</th><th>总出单</th><th>单帖最高</th><th>平均播放</th><th>合作</th><th>命中条件</th>
+                    </tr></thead>
+                    <tbody id="cdCandBody"></tbody>
+                </table>
+            </div>
+            <div style="font-size:12px;color:#94a3b8;margin-top:8px;">
+                规则：出单 &gt; 0 或播放量达到阈值；默认排除在 Payment 里有付费合作（fee &gt; 0）的红人。First Name 可直接在这里填，保存到 Outreach。
+            </div>
+        </div>
+        <div class="modal-footer" style="display:flex;align-items:center;gap:8px;">
+            <span id="cdCandSelectedInfo" style="font-size:13px;color:#475569;margin-right:auto;">已选 0 人</span>
+            <button class="btn-secondary" onclick="cdCandToggleAll(true)">全选</button>
+            <button class="btn-secondary" onclick="cdCandToggleAll(false)">取消全选</button>
+            <button class="btn-secondary" onclick="closeModal('reinviteCandidatesModal')">取消</button>
+            <button class="btn-primary" onclick="cdCandStartReinvite()">加入复邀</button>
+        </div>
     </div>
 </div>
 
@@ -5572,7 +5645,8 @@
                         '<td><input type="number" id="pipe_edit_sampleQty_' + idx + '" value="' + (item.sampleQty || 0) + '" min="0" style="width:60px;border:2px solid #4f46e5;border-radius:4px;padding:4px;font-size:13px;" placeholder="数量"></td>' +
                         '<td><span style="color:#94a3b8;">0</span></td>' +
                         '<td><span class="status-badge status-sampling" style="color:#0369a1;">→ sampling</span></td>' +
-                        '<td><span style="color:#94a3b8;">自动</span></td>' +
+                        // ★ order-pending 状态也支持编辑备注：第 10 列对应表头「备注」，不要新增列
+                        '<td><input type="text" id="pipe_edit_note_' + idx + '" value="' + escHTML(item.pipelineNote || '') + '" placeholder="备注" style="width:120px;padding:4px;"></td>' +
                         '<td><div class="action-buttons">' +
                         '<button class="icon-btn save-btn" onclick="saveOrderPendingRow(\'' + item.id + '\', ' + idx + ')" title="确认寄样">💾</button>' +
                         '<button class="icon-btn cancel-btn" onclick="cancelPipelineEdit()" title="取消">✖️</button>' +
@@ -6106,6 +6180,10 @@
         item.status = 'sampling';
         item.samplingStartDate = today;
 
+        // ★ order-pending 状态也支持编辑备注：与普通编辑共用同一个输入框 id
+        var newNote = document.getElementById('pipe_edit_note_' + idx)?.value || '';
+        item.pipelineNote = newNote;
+
         // 同步到 Outreach
         syncPipelineStatusToOutreach(item.email, 'sampling');
 
@@ -6128,7 +6206,7 @@
         filterPipelineTable(false);  // 保留当前页码（状态由 order-pending → sampling，需重新筛选）
         updateTodayActivity();
 
-        console.log('[Pipeline] 简化编辑完成:', item.email, '寄样数量:', newSampleQty, '→ sampling');
+        console.log('[Pipeline] 简化编辑完成:', item.email, '寄样数量:', newSampleQty, '备注:', newNote, '→ sampling');
     }
 
     // ========== Pipeline → Outreach 状态同步 ==========
@@ -7027,18 +7105,135 @@
         return String(v);
     }
 
+    // ── 复邀优化：Outreach 查找 / 付费判定 / First Name 内联编辑 ──
+    function cdNormalizeEmail(v) { return String(v || '').trim().toLowerCase(); }
+    function cdNormalizeName(v) { return String(v || '').trim().toLowerCase().replace(/^@/, ''); }
+
+    // C&D 的 CSV 只有账号名，没有 first name；统一从 Outreach 按 email 优先、name 兜底取。
+    function cdFindInfluencer(email, name) {
+        var e = cdNormalizeEmail(email);
+        var n = cdNormalizeName(name);
+        if (e) {
+            var hit = allInfluencers.find(function(i) { return cdNormalizeEmail(i.email) === e; });
+            if (hit) return hit;
+        }
+        if (n) {
+            return allInfluencers.find(function(i) { return cdNormalizeName(i.name) === n; }) || null;
+        }
+        return null;
+    }
+
+    // 「付费红人」= paymentData 里存在 fee > 0 的合作（一次性或打包；gifted 不算）
+    function cdHasPaidFee(p) {
+        if (!p) return false;
+        if (p.packageInfo && Number(p.packageInfo.totalFee) > 0) return true;
+        return (p.collaborations || []).some(function(c) {
+            return c && c.type !== 'gifted' && Number(c.fee) > 0;
+        });
+    }
+
+    // First Name 单元格：有值显示绿色；缺值显示橙色「⚠️ 缺失」，可直接输入，失焦保存到 Outreach
+    function cdFirstNameCell(email, name, firstName) {
+        var val = String(firstName || '').trim();
+        return '<input class="cd-fn-input ' + (val ? 'has-value' : 'missing') + '"' +
+            ' value="' + escAttr(val) + '"' +
+            ' placeholder="⚠️ 缺失"' +
+            ' title="填写后自动保存到 Outreach 的 firstName"' +
+            ' data-email="' + escAttr(email || '') + '"' +
+            ' data-name="' + escAttr(name || '') + '"' +
+            ' onchange="cdSaveFirstName(this)"' +
+            ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">';
+    }
+
+    function cdSaveFirstName(input) {
+        var email = String(input.getAttribute('data-email') || '').trim();
+        var name = String(input.getAttribute('data-name') || '').trim();
+        var val = String(input.value || '').trim();
+        var inf = cdFindInfluencer(email, name);
+        if (!inf) {
+            showToast('Outreach 里找不到这个红人，无法保存 First Name', 'error');
+            return;
+        }
+        var oldVal = String(inf.firstName || '').trim();
+        if (oldVal === val) {
+            input.className = 'cd-fn-input ' + (val ? 'has-value' : 'missing');
+            return;
+        }
+        inf.firstName = val;   // 先改内存，失败再回滚
+        fetch('/api/influencers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(allInfluencers)
+        }).then(function(res) { return res.json(); }).then(function(data) {
+            if (!data || !data.success) throw new Error((data && data.error) || '保存失败');
+            input.className = 'cd-fn-input ' + (val ? 'has-value' : 'missing');
+            var eKey = cdNormalizeEmail(email);
+            (cdFiltered || []).forEach(function(it) {
+                if (it && (cdNormalizeEmail(it.email) === eKey || (!eKey && cdNormalizeName(it.name) === cdNormalizeName(name)))) {
+                    it.firstName = val;
+                }
+            });
+            if (typeof cdCandList !== 'undefined' && cdCandList) {
+                cdCandList.forEach(function(x) {
+                    if (cdNormalizeEmail(x.email) === eKey) x.firstName = val;
+                });
+                if (typeof cdCandUpdateStats === 'function') cdCandUpdateStats();
+            }
+            // 同一红人在其他行/弹窗里的输入框同步显示
+            document.querySelectorAll('.cd-fn-input').forEach(function(el) {
+                if (eKey) {
+                    if (cdNormalizeEmail(el.getAttribute('data-email')) === eKey) el.value = val;
+                } else if (cdNormalizeName(el.getAttribute('data-name')) === cdNormalizeName(name)) {
+                    el.value = val;
+                }
+            });
+            showToast(val ? ('已保存 First Name：' + val) : '已清空 First Name', 'success');
+        }).catch(function(err) {
+            inf.firstName = oldVal;
+            input.value = oldVal;
+            showToast('保存失败：' + err.message, 'error');
+        });
+    }
+
     // ── 红人汇总模式：按红人聚合所有月份数据 ──
     function aggregateCDByInfluencer() {
         var result = {};
 
+        // Outreach / Payment 索引：一次构建，避免 4 万条 C&D × 数千红人的 O(n²) 查找
+        var infByEmail = {}, infByName = {};
+        (allInfluencers || []).forEach(function(inf) {
+            var e = cdNormalizeEmail(inf.email);
+            var n = cdNormalizeName(inf.name);
+            if (e && !infByEmail[e]) infByEmail[e] = inf;
+            if (n && !infByName[n]) infByName[n] = inf;
+        });
+        var paidEmail = {}, paidName = {}, paidId = {};
+        (paymentData || []).forEach(function(p) {
+            if (!cdHasPaidFee(p)) return;
+            if (p.influencerId) paidId[p.influencerId] = true;
+            var e = cdNormalizeEmail(p.email);
+            var n = cdNormalizeName(p.name);
+            if (e) paidEmail[e] = true;
+            if (n) paidName[n] = true;
+        });
+
+        // 评级用的「单帖最高出单」也一次算完，避免每个红人都重扫一遍 cdData（O(n²)）
+        var ratingByEmail = {}, ratingByName = {};
+
         cdData.forEach(function(record) {
-            var key = record.email || record.name;
+            // ★ 用 Outreach 回填 email 后再做聚合 key：C&D 的 CSV 没有 email 列，
+            //   同一红人有的月份有 email、有的没有，直接拿 record.email 会拆成两行。
+            var e = cdNormalizeEmail(record.email);
+            var n = cdNormalizeName(record.name);
+            var inf = (e && infByEmail[e]) || (n && infByName[n]) || null;
+            var resolvedEmail = String(record.email || (inf && inf.email) || '').trim();
+            var key = resolvedEmail ? resolvedEmail.toLowerCase() : n;
             if (!key) return;
 
             if (!result[key]) {
                 result[key] = {
-                    email: record.email || '',
-                    name: record.name || '',
+                    email: resolvedEmail,
+                    name: record.name || (inf && inf.name) || '',
                     monthKeys: [],
                     totalOrders: 0,
                     totalViews: 0,
@@ -7046,11 +7241,13 @@
                     totalFulfilledQty: 0,
                     totalLiveCount: 0,
                     totalSampleQty: 0,
+                    maxViews: 0,
                     monthCount: 0
                 };
             }
 
             var r = result[key];
+            if (!r.email && resolvedEmail) r.email = resolvedEmail;
             r.monthKeys.push(record.monthKey);
             r.totalOrders += record.totalOrders || 0;
             r.totalViews += record.totalViews || 0;
@@ -7059,7 +7256,22 @@
             r.totalLiveCount += record.liveCount || 0;
             r.monthCount = r.monthKeys.length;
 
-            var sampleQty = findSampleQtyForMonth(record.email, record.monthKey, record.name);
+            (record.posts || []).forEach(function(post) {
+                var v = Number(post && post.views) || 0;
+                if (v > r.maxViews) r.maxViews = v;
+            });
+
+            // 该条记录里最高的单帖出单（评级口径：同一帖子按单帖算，不跨帖子累加）
+            var recMaxOrders = 0;
+            (record.posts || []).forEach(function(post) {
+                var o = Number(post && post.orders) || 0;
+                if (o > recMaxOrders) recMaxOrders = o;
+            });
+            if (e) ratingByEmail[e] = Math.max(ratingByEmail[e] || 0, recMaxOrders);
+            if (n) ratingByName[n] = Math.max(ratingByName[n] || 0, recMaxOrders);
+            if (resolvedEmail) ratingByEmail[resolvedEmail.toLowerCase()] = Math.max(ratingByEmail[resolvedEmail.toLowerCase()] || 0, recMaxOrders);
+
+            var sampleQty = findSampleQtyForMonth(resolvedEmail, record.monthKey, record.name);
             r.totalSampleQty += (sampleQty || 0);
         });
 
@@ -7070,7 +7282,20 @@
             item.fulfillmentRate = item.totalSampleQty > 0
                 ? Math.round(item.totalFulfilledQty / item.totalSampleQty * 100)
                 : null;
-            item.rating = calculateInfluencerRating(item.email);
+            item.rating = cdRatingFromOrders(
+                (item.email && ratingByEmail[cdNormalizeEmail(item.email)]) ||
+                (item.name && ratingByName[cdNormalizeName(item.name)]) || 0
+            );
+
+            var inf = (item.email && infByEmail[cdNormalizeEmail(item.email)]) ||
+                      (item.name && infByName[cdNormalizeName(item.name)]) || null;
+            item.firstName = inf ? String(inf.firstName || '').trim() : '';
+            item.influencerId = inf ? (inf.id || '') : '';
+            var pe = cdNormalizeEmail(item.email);
+            var pn = cdNormalizeName(item.name);
+            item.paid = !!((item.influencerId && paidId[item.influencerId]) ||
+                           (pe && paidEmail[pe]) ||
+                           (pn && paidName[pn]));
             return item;
         });
 
@@ -7078,6 +7303,16 @@
     }
 
     // ── 红人评级计算（取最高单帖出单数） ──
+    // 评级阈值集中在这里，aggregateCDByInfluencer 的直接计算也复用它，避免两套阈值漂移
+    function cdRatingFromOrders(maxOrders) {
+        var n = Number(maxOrders) || 0;
+        if (n >= 300) return 'S级';
+        if (n >= 100) return 'A级';
+        if (n >= 30) return 'B级';
+        if (n >= 10) return 'C级';
+        return 'D级';
+    }
+
     function calculateInfluencerRating(email) {
         if (!email) return '-';
 
@@ -7095,12 +7330,7 @@
             }
         });
 
-        // 根据最高出单数评定等级
-        if (maxOrders >= 300) return 'S级';
-        if (maxOrders >= 100) return 'A级';
-        if (maxOrders >= 30) return 'B级';
-        if (maxOrders >= 10) return 'C级';
-        return 'D级';
+        return cdRatingFromOrders(maxOrders);
     }
 
     // ── 按月评级计算（按帖子链接分组，取单帖总出单最高值） ──
@@ -7168,6 +7398,9 @@
             cdViewMode = 'monthly';
             btn.textContent = '📊 红人汇总';
             btn.classList.remove('active');
+            // 按月视图不显示汇总专用筛选，切回时重置，避免下次进汇总还带着旧条件
+            var quickEl = document.getElementById('cdReinviteFilter');
+            if (quickEl) quickEl.value = 'all';
         }
         cdFilterTable();
     }
@@ -7399,15 +7632,19 @@
     function cdFilterTable() {
         var keyword = document.getElementById('cdSearch').value.toLowerCase();
         var month = document.getElementById('cdMonthFilter').value;
+        // 汇总视图专用快捷筛选（按月视图下隐藏，不参与过滤）
+        var quickEl = document.getElementById('cdReinviteFilter');
+        var quickFilter = (cdViewMode === 'aggregated' && quickEl) ? (quickEl.value || 'all') : 'all';
 
         var sourceData = (cdViewMode === 'aggregated')
             ? aggregateCDByInfluencer()
             : cdData;
 
         cdFiltered = sourceData.filter(function(item) {
-            // 搜索筛选
-            if (keyword && !((item.name || '').toLowerCase().includes(keyword) || (item.email || '').toLowerCase().includes(keyword))) {
-                return false;
+            // 搜索筛选（汇总视图额外支持按 First Name 搜）
+            if (keyword) {
+                var hay = String(item.name || '') + ' ' + String(item.email || '') + ' ' + String(item.firstName || '');
+                if (hay.toLowerCase().indexOf(keyword) === -1) return false;
             }
 
             // 月份筛选
@@ -7422,6 +7659,19 @@
                     if (item.monthKey !== month) {
                         return false;
                     }
+                }
+            }
+
+            // 汇总视图快捷筛选
+            if (cdViewMode === 'aggregated' && quickFilter !== 'all') {
+                if (quickFilter === 'missingName') {
+                    if (String(item.firstName || '').trim()) return false;
+                } else if (quickFilter === 'paid') {
+                    if (!item.paid) return false;
+                } else if (quickFilter === 'candidate') {
+                    // 与「可复邀名单」默认口径一致：出单 > 0 或单帖最高播放 ≥ 5000，且未付费
+                    var eligible = (Number(item.totalOrders) || 0) > 0 || (Number(item.maxViews) || 0) >= 5000;
+                    if (!eligible || item.paid) return false;
                 }
             }
 
@@ -7446,6 +7696,10 @@
                 var valA = a.totalOrders || 0;
                 var valB = b.totalOrders || 0;
                 return cdSortOrder === 'asc' ? valA - valB : valB - valA;
+            } else if (cdViewMode === 'aggregated') {
+                // 汇总视图默认把「出单多、播放高」的排前面，复邀时一眼看到值得找的人
+                return ((Number(b.totalOrders) || 0) - (Number(a.totalOrders) || 0)) ||
+                       ((Number(b.avgViews) || 0) - (Number(a.avgViews) || 0));
             } else {
                 // 默认按月份倒序（仅按月模式有 monthKey）
                 return (b.monthKey || '').localeCompare(a.monthKey || '');
@@ -7470,14 +7724,14 @@
             if (cdViewMode === 'aggregated') {
                 thead.innerHTML = '<tr>' +
                     '<th><input type="checkbox" id="cdSelectAll" onclick="cdToggleSelectAll()" title="全选/取消全选"></th>' +
-                    '<th>合作月份数</th><th>红人ID</th><th>邮箱</th><th>评级</th><th>总寄样数</th><th>总履约数</th><th>履约率</th><th>总上线数</th>' +
+                    '<th>合作月份数</th><th>红人ID</th><th>First Name</th><th>邮箱</th><th>评级</th><th>总寄样数</th><th>总履约数</th><th>履约率</th><th>总上线数</th>' +
                     '<th onclick="sortCDTable(\'totalViews\')" style="cursor:pointer;">平均播放量(k) <span id="cd-sort-views">⇅</span></th>' +
                     '<th onclick="sortCDTable(\'totalOrders\')" style="cursor:pointer;">总出单数 <span id="cd-sort-orders">⇅</span></th>' +
                     '</tr>';
             } else {
                 thead.innerHTML = '<tr>' +
                     '<th><input type="checkbox" id="cdSelectAll" onclick="cdToggleSelectAll()" title="全选/取消全选"></th>' +
-                    '<th>月份</th><th>红人ID</th><th>邮箱</th>' +
+                    '<th>月份</th><th>红人ID</th><th>First Name</th><th>邮箱</th>' +
                     (showRating ? '<th>评级</th>' : '') +
                     '<th>寄样数量</th><th>已履约</th><th>履约率</th><th>上线数量</th>' +
                     '<th onclick="sortCDTable(\'totalViews\')" style="cursor:pointer;">平均播放量(k) <span id="cd-sort-views">⇅</span></th>' +
@@ -7507,9 +7761,10 @@
                     : '<span style="color:#94a3b8;">-</span>';
 
                 html += '<tr>' +
-                    '<td><input type="checkbox" class="cd-row-checkbox" data-id="' + item.email + '" onchange="updateCdDeleteButton()"></td>' +
+                    '<td><input type="checkbox" class="cd-row-checkbox" data-id="' + escAttr(item.email || item.name || '') + '" data-email="' + escAttr(item.email || '') + '" data-name="' + escAttr(item.name || '') + '" onchange="updateCdDeleteButton()"></td>' +
                     '<td>' + item.monthCount + ' 个月</td>' +
                     '<td><span class="copy-cell">' + escHTML(item.name || '-') + '</span></td>' +
+                    '<td>' + cdFirstNameCell(item.email, item.name, item.firstName) + '</td>' +
                     '<td><span class="copy-cell">' + escHTML(item.email || '-') + '</span></td>' +
                     '<td><span class="rating-badge ' + getRatingClass(item.rating) + '">' + (item.rating || '-') + '</span></td>' +
                     '<td>' + (item.totalSampleQty || 0) + '</td>' +
@@ -7547,10 +7802,15 @@
                 // ★ 选择具体月份时计算该月评级
                 var monthRating = showRating ? calculateRatingForMonth(item.email, item.monthKey) : '';
 
+                // First Name 统一从 Outreach 取（email 优先、name 兜底）
+                var monthInf = cdFindInfluencer(item.email, item.name);
+                var monthFirstName = monthInf ? monthInf.firstName : '';
+
                 html += '<tr>' +
-                    '<td><input type="checkbox" class="cd-row-checkbox" data-id="' + item.id + '" onchange="updateCdDeleteButton()"></td>' +
+                    '<td><input type="checkbox" class="cd-row-checkbox" data-id="' + escAttr(item.id || '') + '" data-email="' + escAttr(item.email || '') + '" data-name="' + escAttr(item.name || '') + '" onchange="updateCdDeleteButton()"></td>' +
                     '<td>' + (item.monthKey || '-') + '</td>' +
                     '<td><span class="copy-cell">' + escHTML(item.name || '-') + '</span></td>' +
+                    '<td>' + cdFirstNameCell(item.email, item.name, monthFirstName) + '</td>' +
                     '<td><span class="copy-cell">' + escHTML(item.email || '-') + '</span></td>' +
                     (showRating ? '<td><span class="rating-badge ' + getRatingClass(monthRating) + '">' + monthRating + '</span></td>' : '') +
                     '<td>' + (sampleQty || 0) + '</td>' +
@@ -7562,8 +7822,22 @@
                     '</tr>';
             }
         }
-        var emptyColspan = (cdViewMode === 'aggregated') ? 11 : (showRating ? 11 : 10);
+        var emptyColspan = (cdViewMode === 'aggregated') ? 12 : (showRating ? 12 : 11);
         tbody.innerHTML = html || '<tr><td colspan="' + emptyColspan + '" style="text-align:center;">暂无数据</td></tr>';
+
+        // 快捷筛选与「缺 First Name」提示只在汇总视图出现
+        var filterWrap = document.getElementById('cdReinviteFilterWrap');
+        if (filterWrap) filterWrap.style.display = (cdViewMode === 'aggregated') ? 'inline-flex' : 'none';
+        var firstNameStat = document.getElementById('cdFirstNameStat');
+        if (firstNameStat) {
+            if (cdViewMode === 'aggregated') {
+                var missingCount = cdFiltered.filter(function(it) { return !String(it.firstName || '').trim(); }).length;
+                firstNameStat.innerText = missingCount > 0 ? ('⚠️ ' + missingCount + ' 人缺 First Name') : '';
+            } else {
+                firstNameStat.innerText = '';
+            }
+        }
+
         cdUpdatePagination();
     }
 
@@ -7693,46 +7967,57 @@
         var recipients = [];
         var seen = {};
         boxes.forEach(function(box) {
-            var dataId = box.getAttribute('data-id');
-            var email = null;
-            var name = '';
-            if (cdViewMode === 'aggregated') {
-                email = dataId;
-            } else {
-                var item = cdData.find(function(r) { return r.id === dataId; });
-                if (item) { email = item.email; name = item.name || ''; }
+            var email = String(box.getAttribute('data-email') || '').trim();
+            var name = String(box.getAttribute('data-name') || '').trim();
+
+            // 兼容旧行/旧缓存：没有 data-email 时回退到 data-id + cdData 查找
+            if (!email && cdViewMode !== 'aggregated') {
+                var item = cdData.find(function(r) { return r.id === box.getAttribute('data-id'); });
+                if (item) { email = String(item.email || '').trim(); name = name || String(item.name || '').trim(); }
             }
-            if (email) {
-                var key = String(email).trim().toLowerCase();
-                if (!seen[key]) {
-                    seen[key] = true;
-                    if (!name) {
-                        var rec = cdData.find(function(r) { return r.email === email; });
-                        if (rec) name = rec.name || '';
-                    }
-                    // ★ 名字必须从红人库 firstName 取，不能拿 cdData.name（那是账号名/ID，如 "icyfires4"）。
-                    //   按 email 匹配红人库 → 取 firstName；取不到就留空，后端 _fillRecipientName 会兜底成 "there"。
-                    var inf = allInfluencers.find(function(i) { return i.email && String(i.email).trim().toLowerCase() === key; });
-                    var firstName = (inf && inf.firstName && String(inf.firstName).trim()) ? String(inf.firstName).trim() : '';
-                    console.log('[复邀取名] email=' + email + ' cdData.name=' + (name || '') + ' 红人库.firstName=' + (inf && inf.firstName ? inf.firstName : '') + ' → 取 "' + firstName + '"');
-                    recipients.push({ email: email, firstName: firstName });
-                }
+            if (!email && cdViewMode === 'aggregated') {
+                var dataId = String(box.getAttribute('data-id') || '').trim();
+                if (dataId.indexOf('@') !== -1) email = dataId;
+                else if (!name) name = dataId;
             }
+            if (!email) return;
+
+            var key = email.toLowerCase();
+            if (seen[key]) return;
+            seen[key] = true;
+
+            // ★ 名字必须从红人库 firstName 取，不能拿 cdData.name（那是账号名/ID）。
+            //   email 优先、name 兜底；取不到就留空，后端 _fillRecipientName 会兜底成 "there"。
+            var inf = cdFindInfluencer(email, name);
+            var firstName = (inf && inf.firstName && String(inf.firstName).trim()) ? String(inf.firstName).trim() : '';
+            console.log('[复邀取名] email=' + email + ' cdData.name=' + (name || '') + ' 红人库.firstName=' + (inf && inf.firstName ? inf.firstName : '') + ' → 取 "' + firstName + '"');
+            recipients.push({ email: email, firstName: firstName });
         });
         return recipients;
     }
 
     // ── C&D 复邀 ──
-    function openReinviteModal() {
-        var recipients = getSelectedCDRecipients();
-        if (recipients.length === 0) { alert('请先勾选要复邀的红人'); return; }
-        document.getElementById('reinviteSummary').innerText = '📧 本次复邀 ' + recipients.length + ' 个红人（按邮箱去重）';
+    // 从「可复邀名单」进来时，用这份名单覆盖 DOM 勾选；直接点「复邀」时为 null
+    var reinviteRecipientsOverride = null;
+
+    function openReinviteModal(recipients) {
+        var fromOverride = Array.isArray(recipients) && recipients.length > 0;
+        var list = fromOverride ? recipients.slice() : getSelectedCDRecipients();
+        if (list.length === 0) { alert('请先勾选要复邀的红人'); return; }
+        reinviteRecipientsOverride = fromOverride ? list : null;
+
+        var missing = list.filter(function(r) { return !String(r.firstName || '').trim(); }).length;
+        var summary = '📧 本次复邀 ' + list.length + ' 个红人（按邮箱去重）';
+        if (missing > 0) {
+            summary += '<br><span style="color:#c2410c;">⚠️ ' + missing + ' 人缺 First Name，正文会显示 "Hi there"</span>';
+        }
+        document.getElementById('reinviteSummary').innerHTML = summary;
         document.getElementById('reinviteScheduleTime').value = DEFAULT_SCHEDULE_TIME;
         document.getElementById('reinviteModal').style.display = 'flex';
     }
 
     function confirmReinvite() {
-        var recipients = getSelectedCDRecipients();
+        var recipients = reinviteRecipientsOverride || getSelectedCDRecipients();
         if (recipients.length === 0) { alert('请先勾选要复邀的红人'); return; }
         var templateName = ((document.getElementById('reinviteTemplateName') || {}).value || '').trim();
         var scheduleTime = ((document.getElementById('reinviteScheduleTime') || {}).value || '').trim();
@@ -7754,6 +8039,7 @@
         .then(function(data) {
             if (confirmBtn) confirmBtn.disabled = false;
             if (data && data.results !== undefined) {
+                reinviteRecipientsOverride = null;
                 closeModal('reinviteModal');
                 var failedList = (data.results || []).filter(function(r) { return r.status === 'error'; });
                 if (failedList.length > 0) {
@@ -7769,6 +8055,142 @@
             console.error('[reinvite] 请求失败:', err);
             alert('请求失败: ' + err.message);
         });
+    }
+
+    // ── 可复邀名单（智能筛选）──
+    // 规则：出单 > 0 或 播放量达到阈值；默认排除 Payment 里有付费合作（fee > 0）的红人。
+    // 纯前端规则计算，不调用 AI/外部接口；数据全部来自 cdData + allInfluencers + paymentData。
+    var cdCandList = [];
+
+    function openReinviteCandidates() {
+        if (!cdData || cdData.length === 0) {
+            showToast('C&D 还没有数据，先导入或新增记录', 'error');
+            return;
+        }
+        document.getElementById('reinviteCandidatesModal').style.display = 'flex';
+        cdRenderCandidates();
+    }
+
+    function cdRenderCandidates() {
+        var thresholdEl = document.getElementById('cdCandViewsThreshold');
+        var threshold = parseInt(thresholdEl && thresholdEl.value, 10);
+        if (isNaN(threshold) || threshold < 0) threshold = 5000;
+
+        var mode = document.getElementById('cdCandViewsMode').value || 'max';
+        var requireOrders = document.getElementById('cdCandRequireOrders').checked;
+        var requireViews = document.getElementById('cdCandRequireViews').checked;
+        var excludePaid = document.getElementById('cdCandExcludePaid').checked;
+        if (!requireOrders && !requireViews) {
+            alert('至少勾选一个条件：有出单 / 播放量');
+            return;
+        }
+
+        var all = aggregateCDByInfluencer();
+        var paidCount = 0, noEmailCount = 0, missingName = 0;
+        var list = [];
+
+        all.forEach(function(it) {
+            var email = String(it.email || '').trim();
+            if (!email) { noEmailCount++; return; }
+            if (excludePaid && it.paid) { paidCount++; return; }
+
+            var orders = Number(it.totalOrders) || 0;
+            var maxViews = Number(it.maxViews) || 0;
+            var avgViews = Number(it.avgViews) || 0;
+            var metric = (mode === 'avg') ? avgViews : maxViews;
+            var hitOrders = requireOrders && orders > 0;
+            var hitViews = requireViews && metric >= threshold;
+            if (!hitOrders && !hitViews) return;
+
+            var firstName = String(it.firstName || '').trim();
+            if (!firstName) missingName++;
+            list.push({
+                email: email,
+                name: String(it.name || ''),
+                firstName: firstName,
+                orders: orders,
+                maxViews: maxViews,
+                avgViews: avgViews,
+                months: Number(it.monthCount) || 0,
+                rating: it.rating || '-',
+                metric: metric,
+                hitOrders: hitOrders,
+                hitViews: hitViews
+            });
+        });
+
+        // 出单优先，其次播放量：名单顶部就是最值得复邀的人
+        list.sort(function(a, b) {
+            return (b.orders - a.orders) || (b.metric - a.metric);
+        });
+        cdCandList = list;
+
+        var tbody = document.getElementById('cdCandBody');
+        var html = '';
+        list.forEach(function(x) {
+            var badges = '';
+            if (x.hitOrders) badges += '<span class="cd-cand-badge orders">出单 ' + x.orders + '</span>';
+            if (x.hitViews) badges += '<span class="cd-cand-badge views">' + (mode === 'avg' ? '均播 ' : '最高 ') + cdFormatViews(x.metric) + '</span>';
+            if (!x.firstName) badges += '<span class="cd-cand-badge warn">缺名字</span>';
+            html += '<tr>' +
+                '<td><input type="checkbox" class="cd-cand-checkbox" data-email="' + escAttr(x.email) + '" checked onchange="cdCandUpdateStats()"></td>' +
+                '<td><span class="copy-cell">' + escHTML(x.name || '-') + '</span></td>' +
+                '<td><span class="copy-cell">' + escHTML(x.email) + '</span></td>' +
+                '<td>' + cdFirstNameCell(x.email, x.name, x.firstName) + '</td>' +
+                '<td>' + x.orders + '</td>' +
+                '<td>' + cdFormatViews(x.maxViews) + '</td>' +
+                '<td>' + cdFormatViews(x.avgViews) + '</td>' +
+                '<td>' + x.months + ' 个月</td>' +
+                '<td>' + badges + '</td>' +
+                '</tr>';
+        });
+        tbody.innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px;">没有符合条件的红人，试试放宽播放量阈值</td></tr>';
+
+        document.getElementById('cdCandStats').innerHTML =
+            '候选 <b>' + list.length + '</b> 人 ｜ 已排除付费 <b>' + paidCount + '</b> 人 ｜ 缺邮箱 <b>' + noEmailCount + '</b> 人 ｜ 缺 First Name <b style="color:#c2410c;">' + missingName + '</b> 人';
+        var selAll = document.getElementById('cdCandSelectAll');
+        if (selAll) { selAll.checked = list.length > 0; selAll.indeterminate = false; }
+        cdCandUpdateStats();
+    }
+
+    function cdCandUpdateStats() {
+        var all = document.querySelectorAll('.cd-cand-checkbox');
+        var checked = document.querySelectorAll('.cd-cand-checkbox:checked');
+        var info = document.getElementById('cdCandSelectedInfo');
+        if (info) info.innerText = '已选 ' + checked.length + ' 人';
+        var selAll = document.getElementById('cdCandSelectAll');
+        if (selAll) {
+            selAll.checked = all.length > 0 && checked.length === all.length;
+            selAll.indeterminate = checked.length > 0 && checked.length < all.length;
+        }
+    }
+
+    function cdCandToggleAll(checked) {
+        document.querySelectorAll('.cd-cand-checkbox').forEach(function(b) { b.checked = checked; });
+        cdCandUpdateStats();
+    }
+
+    function cdCandStartReinvite() {
+        var boxes = document.querySelectorAll('.cd-cand-checkbox:checked');
+        var recipients = [];
+        var seen = {};
+        boxes.forEach(function(b) {
+            var email = String(b.getAttribute('data-email') || '').trim();
+            if (!email) return;
+            var key = email.toLowerCase();
+            if (seen[key]) return;
+            seen[key] = true;
+            var rec = cdCandList.find(function(x) { return x.email.toLowerCase() === key; });
+            recipients.push({ email: email, firstName: rec ? String(rec.firstName || '').trim() : '' });
+        });
+
+        if (recipients.length === 0) { alert('请先勾选要复邀的红人'); return; }
+        if (recipients.length > 20 && !confirm('本次将复邀 ' + recipients.length + ' 人，耗时会较长（每封约 1-2 分钟），确定继续？')) return;
+        var missing = recipients.filter(function(r) { return !r.firstName; }).length;
+        if (missing > 0 && !confirm('有 ' + missing + ' 人缺 First Name，正文会显示 "Hi there"。仍然继续？')) return;
+
+        closeModal('reinviteCandidatesModal');
+        openReinviteModal(recipients);
     }
 
     // ── 删除选中的记录 ──
