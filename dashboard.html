@@ -2561,6 +2561,8 @@
                     <option value="avg">平均播放</option>
                 </select>
                 <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="cdCandExcludePaid" checked onchange="cdRenderCandidates()"> 排除付费红人</label>
+                <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="cdCandSkipNoFirstName" onchange="cdRenderCandidates()"> 跳过无 firstName 的红人</label>
+                <label style="display:flex;align-items:center;gap:5px;"><input type="checkbox" id="cdCandSkipNoEmail" onchange="cdRenderCandidates()"> 跳过无邮箱的红人</label>
                 <button class="btn-secondary" onclick="cdRenderCandidates()" style="padding:5px 12px;font-size:12px;">重新筛选</button>
             </div>
             <div id="cdCandStats" style="font-size:12px;color:#475569;margin-bottom:8px;"></div>
@@ -2574,7 +2576,9 @@
                 </table>
             </div>
             <div style="font-size:12px;color:#94a3b8;margin-top:8px;">
-                规则：出单 &gt; 0 或播放量达到阈值；默认排除在 Payment 里有付费合作（fee &gt; 0）的红人。First Name 可直接在这里填，保存到 Outreach。
+                规则：出单 &gt; 0 或播放量达到阈值；默认排除在 Payment 里有付费合作（fee &gt; 0）的红人。<br>
+                可选：跳过无 firstName 的红人（通常是故意不填、不想再合作）；跳过无邮箱的红人（通常是改名/匹配失败导致邮箱丢失）。<br>
+                First Name 可直接在这里填，保存到 Outreach。
             </div>
         </div>
         <div class="modal-footer" style="display:flex;align-items:center;gap:8px;">
@@ -8129,13 +8133,17 @@
             return;
         }
 
+        // ★ 可选跳过条件：无 firstName 常是“故意不填、不想再合作”；
+        //   无邮箱常是改名/匹配失败导致邮箱丢失。默认都不勾，保持原名单完整。
+        var skipNoName = document.getElementById('cdCandSkipNoFirstName').checked;
+        var skipNoEmail = document.getElementById('cdCandSkipNoEmail').checked;
+
         var all = aggregateCDByInfluencer();
-        var paidCount = 0, noEmailCount = 0, missingName = 0;
+        var paidCount = 0, skippedNoName = 0, skippedNoEmail = 0;
+        var includedNoName = 0, includedNoEmail = 0;
         var list = [];
 
         all.forEach(function(it) {
-            var email = String(it.email || '').trim();
-            if (!email) { noEmailCount++; return; }
             if (excludePaid && it.paid) { paidCount++; return; }
 
             var orders = Number(it.totalOrders) || 0;
@@ -8146,8 +8154,15 @@
             var hitViews = requireViews && metric >= threshold;
             if (!hitOrders && !hitViews) return;
 
+            var email = String(it.email || '').trim();
             var firstName = String(it.firstName || '').trim();
-            if (!firstName) missingName++;
+
+            if (skipNoName && !firstName) { skippedNoName++; return; }
+            if (skipNoEmail && !email) { skippedNoEmail++; return; }
+
+            if (!firstName) includedNoName++;
+            if (!email) includedNoEmail++;
+
             list.push({
                 email: email,
                 name: String(it.name || ''),
@@ -8163,23 +8178,35 @@
             });
         });
 
-        // 出单优先，其次播放量：名单顶部就是最值得复邀的人
+        // 固定排序：出单降序 → 播放量降序 → name 字母序 → email 字母序。
+        // ★ 名单位置稳定：切换“跳过无 firstName / 无邮箱”只是从这份固定顺序里删人，
+        //   剩下人的相对顺序不变，所以“前 100 个”始终是同一批。
         list.sort(function(a, b) {
-            return (b.orders - a.orders) || (b.metric - a.metric);
+            return (b.orders - a.orders) ||
+                   (b.metric - a.metric) ||
+                   String(a.name || '').localeCompare(String(b.name || '')) ||
+                   String(a.email || '').localeCompare(String(b.email || ''));
         });
         cdCandList = list;
 
         var tbody = document.getElementById('cdCandBody');
         var html = '';
         list.forEach(function(x) {
+            var canSend = !!x.email;
             var badges = '';
             if (x.hitOrders) badges += '<span class="cd-cand-badge orders">出单 ' + x.orders + '</span>';
             if (x.hitViews) badges += '<span class="cd-cand-badge views">' + (mode === 'avg' ? '均播 ' : '最高 ') + cdFormatViews(x.metric) + '</span>';
             if (!x.firstName) badges += '<span class="cd-cand-badge warn">缺名字</span>';
+            if (!canSend) badges += '<span class="cd-cand-badge warn">缺邮箱</span>';
+
+            var checkbox = canSend
+                ? '<input type="checkbox" class="cd-cand-checkbox" data-email="' + escAttr(x.email) + '" checked onchange="cdCandUpdateStats()">'
+                : '<input type="checkbox" class="cd-cand-checkbox" data-email="" disabled title="缺邮箱，无法复邀">';
+
             html += '<tr>' +
-                '<td><input type="checkbox" class="cd-cand-checkbox" data-email="' + escAttr(x.email) + '" checked onchange="cdCandUpdateStats()"></td>' +
+                '<td>' + checkbox + '</td>' +
                 '<td><span class="copy-cell">' + escHTML(x.name || '-') + '</span></td>' +
-                '<td><span class="copy-cell">' + escHTML(x.email) + '</span></td>' +
+                '<td><span class="copy-cell">' + escHTML(x.email || '-') + '</span></td>' +
                 '<td>' + cdFirstNameCell(x.email, x.name, x.firstName) + '</td>' +
                 '<td>' + x.orders + '</td>' +
                 '<td>' + cdFormatViews(x.maxViews) + '</td>' +
@@ -8190,27 +8217,36 @@
         });
         tbody.innerHTML = html || '<tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:24px;">没有符合条件的红人，试试放宽播放量阈值</td></tr>';
 
-        document.getElementById('cdCandStats').innerHTML =
-            '候选 <b>' + list.length + '</b> 人 ｜ 已排除付费 <b>' + paidCount + '</b> 人 ｜ 缺邮箱 <b>' + noEmailCount + '</b> 人 ｜ 缺 First Name <b style="color:#c2410c;">' + missingName + '</b> 人';
-        var selAll = document.getElementById('cdCandSelectAll');
-        if (selAll) { selAll.checked = list.length > 0; selAll.indeterminate = false; }
+        // 统计：把「排除」和「名单内缺失」分开说，避免误以为缺邮箱的人也能发
+        var sendable = list.filter(function(x) { return !!x.email; }).length;
+        var parts = ['候选 <b>' + list.length + '</b> 人', '可发送 <b>' + sendable + '</b> 人'];
+        if (excludePaid) parts.push('已排除付费 <b>' + paidCount + '</b> 人');
+        if (skipNoName) parts.push('跳过无 firstName <b style="color:#c2410c;">' + skippedNoName + '</b> 人');
+        if (skipNoEmail) parts.push('跳过无邮箱 <b style="color:#c2410c;">' + skippedNoEmail + '</b> 人');
+        if (includedNoName) parts.push('名单内缺 firstName <b style="color:#c2410c;">' + includedNoName + '</b> 人');
+        if (includedNoEmail) parts.push('名单内缺邮箱 <b style="color:#c2410c;">' + includedNoEmail + '</b> 人（不可发送）');
+        document.getElementById('cdCandStats').innerHTML = parts.join(' ｜ ');
+
         cdCandUpdateStats();
     }
 
     function cdCandUpdateStats() {
-        var all = document.querySelectorAll('.cd-cand-checkbox');
+        // 缺邮箱的行 checkbox 是 disabled，不参与“全选/已选”计数
+        var selectable = document.querySelectorAll('.cd-cand-checkbox:not(:disabled)');
         var checked = document.querySelectorAll('.cd-cand-checkbox:checked');
         var info = document.getElementById('cdCandSelectedInfo');
         if (info) info.innerText = '已选 ' + checked.length + ' 人';
         var selAll = document.getElementById('cdCandSelectAll');
         if (selAll) {
-            selAll.checked = all.length > 0 && checked.length === all.length;
-            selAll.indeterminate = checked.length > 0 && checked.length < all.length;
+            selAll.checked = selectable.length > 0 && checked.length === selectable.length;
+            selAll.indeterminate = checked.length > 0 && checked.length < selectable.length;
         }
     }
 
     function cdCandToggleAll(checked) {
-        document.querySelectorAll('.cd-cand-checkbox').forEach(function(b) { b.checked = checked; });
+        document.querySelectorAll('.cd-cand-checkbox').forEach(function(b) {
+            if (!b.disabled) b.checked = checked;
+        });
         cdCandUpdateStats();
     }
 
