@@ -3996,11 +3996,23 @@
     // 窗口尺寸变化 = 布局整体重排，直接收起更稳妥
     window.addEventListener('resize', closeNavDropdown);
 
+    // ★ 搜索/筛选变化时清空选中：列表变了，之前跨页全选的 ID 可能已不在当前结果里。
+    //   若不清空，用户只看到 1 个红人，内部却还记着之前全选的 100+ 个，
+    //   点“安排寄样”会把看不见的人一起加入 order-pending。
+    function clearOutreachSelectionForFilterChange() {
+        if (selectedInfluencerIds.size === 0) return;
+        selectedInfluencerIds.clear();
+        var selectAll = document.getElementById('selectAll');
+        if (selectAll) selectAll.checked = false;
+        updateToolbarButtons();
+    }
+
     // ── 只看今日 ──
     // 状态以 isTodayFilterActive 为准，按钮高亮统一由 updateNavState() 同步
     function filterToday() {
         isTodayFilterActive = !isTodayFilterActive;
         currentPage = 1;
+        clearOutreachSelectionForFilterChange();
         updateNavState();
         applyFiltersAndRender();
     }
@@ -4009,11 +4021,15 @@
     function filterFavorites() {
         isFavoriteFilterActive = !isFavoriteFilterActive;
         currentPage = 1;
+        clearOutreachSelectionForFilterChange();
         updateNavState();
         applyFiltersAndRender();
     }
 
     function filterInfluencers(resetPage) {
+        // ★ 搜索/筛选变化时清空选中，避免全选状态残留导致误操作
+        //   （搜索框、清除搜索、状态下拉、清除全部筛选最终都会走到这里）
+        clearOutreachSelectionForFilterChange();
         // 默认重置页码，传递 false 则保留当前页码
         if (resetPage !== false) {
             currentPage = 1;
@@ -4963,13 +4979,17 @@
     }
 
     function arrangeSampling() {
-        var selectedCount = selectedInfluencerIds.size;
+        // ★ 只处理「当前筛选结果里、且确实被勾选」的红人：
+        //   getSelectedInfluencers() 读的是跨页选中集合；搜索/筛选后若仍有残留，
+        //   这里再和 filteredInfluencers 取交集，确保不会把看不见的红人一起加入 order-pending。
+        var selectedInfluencers = getSelectedInfluencers().filter(function(inf) {
+            return filteredInfluencers.some(function(f) { return f.id === inf.id; });
+        });
+        var selectedCount = selectedInfluencers.length;
         if (selectedCount === 0) {
             showToast('请至少选择一个红人', 'error');
             return;
         }
-
-        var selectedInfluencers = getSelectedInfluencers();
 
         selectedInfluencers.forEach(function(influencer) {
             influencer.status = 'order-pending';
